@@ -75,8 +75,10 @@ def _parse_params(params_raw: str):
         tokens = p.rsplit(None, 1)
         if len(tokens) == 2:
             ptype, pname = tokens
-            # 清理指针符号
-            pname = pname.lstrip("*")
+            # 指针符号可能附在变量名前（如 int *ptr）——将其归还给类型
+            while pname.startswith("*"):
+                ptype = ptype + " *"
+                pname = pname[1:]
         else:
             ptype, pname = p, ""
         params.append({
@@ -130,9 +132,9 @@ def find_south_deps(src_files, all_module_names):
             stem = Path(inc).stem
             if stem in all_module_names:
                 deps.add(stem)
-            elif inc.startswith(("<", '"')) or "/" in inc:
-                # 可能是外部库
-                ext_libs.add(inc.split("/")[0].split(".")[0])
+            elif "/" in inc:
+                # 路径含 / 说明是带子目录的外部库，例如 openssl/evp.h
+                ext_libs.add(inc.split("/")[0])
 
     result = [{"module": d, "type": "internal"} for d in sorted(deps)]
     result += [{"module": l, "type": "external"} for l in sorted(ext_libs) if l]

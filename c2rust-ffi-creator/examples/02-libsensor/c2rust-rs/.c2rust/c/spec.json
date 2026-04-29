@@ -1,0 +1,262 @@
+{
+  "project": {
+    "name": "c2rust-rs",
+    "version": "0.1.0",
+    "build_system": "make",
+    "build_command": "make",
+    "test_command": "make test",
+    "output_artifacts": [],
+    "test_files": [
+      "tests/test_pressure.c",
+      "tests/test_temperature.c"
+    ]
+  },
+  "modules": [
+    {
+      "name": "i2c",
+      "header": "include/platform/linux/i2c.h",
+      "sources": [
+        "src/platform/linux/i2c.c"
+      ],
+      "north_interfaces": [
+        {
+          "function": "i2c_open",
+          "signature": "int i2c_open(const char *bus_path)",
+          "params": [
+            {
+              "name": "bus_path",
+              "type": "const char *",
+              "direction": "in"
+            }
+          ],
+          "return_type": "int",
+          "description": ""
+        },
+        {
+          "function": "i2c_close",
+          "signature": "void i2c_close(int fd)",
+          "params": [
+            {
+              "name": "fd",
+              "type": "int",
+              "direction": "in"
+            }
+          ],
+          "return_type": "void",
+          "description": ""
+        },
+        {
+          "function": "i2c_write",
+          "signature": "int i2c_write(int fd, uint8_t addr, const uint8_t *data, size_t len)",
+          "params": [
+            {
+              "name": "fd",
+              "type": "int",
+              "direction": "in"
+            },
+            {
+              "name": "addr",
+              "type": "uint8_t",
+              "direction": "in"
+            },
+            {
+              "name": "data",
+              "type": "const uint8_t *",
+              "direction": "in"
+            },
+            {
+              "name": "len",
+              "type": "size_t",
+              "direction": "in"
+            }
+          ],
+          "return_type": "int",
+          "description": ""
+        },
+        {
+          "function": "i2c_read",
+          "signature": "int i2c_read(int fd, uint8_t addr, uint8_t *buf, size_t len)",
+          "params": [
+            {
+              "name": "fd",
+              "type": "int",
+              "direction": "in"
+            },
+            {
+              "name": "addr",
+              "type": "uint8_t",
+              "direction": "in"
+            },
+            {
+              "name": "buf",
+              "type": "uint8_t *",
+              "direction": "in"
+            },
+            {
+              "name": "len",
+              "type": "size_t",
+              "direction": "in"
+            }
+          ],
+          "return_type": "int",
+          "description": ""
+        }
+      ],
+      "south_deps": [
+        {
+          "module": "platform",
+          "type": "external"
+        }
+      ],
+      "data_contracts": [],
+      "test_coverage": []
+    },
+    {
+      "name": "pressure",
+      "header": "include/sensor/pressure.h",
+      "sources": [
+        "src/sensor/pressure.c"
+      ],
+      "north_interfaces": [
+        {
+          "function": "pressure_sensor_init",
+          "signature": "int pressure_sensor_init(uint8_t addr)",
+          "params": [
+            {
+              "name": "addr",
+              "type": "uint8_t",
+              "direction": "in"
+            }
+          ],
+          "return_type": "int",
+          "description": ""
+        },
+        {
+          "function": "pressure_sensor_read",
+          "signature": "int pressure_sensor_read(uint8_t addr, pressure_reading_t *out)",
+          "params": [
+            {
+              "name": "addr",
+              "type": "uint8_t",
+              "direction": "in"
+            },
+            {
+              "name": "out",
+              "type": "pressure_reading_t *",
+              "direction": "in"
+            }
+          ],
+          "return_type": "int",
+          "description": ""
+        },
+        {
+          "function": "pressure_sensor_shutdown",
+          "signature": "void pressure_sensor_shutdown(uint8_t addr)",
+          "params": [
+            {
+              "name": "addr",
+              "type": "uint8_t",
+              "direction": "in"
+            }
+          ],
+          "return_type": "void",
+          "description": ""
+        }
+      ],
+      "south_deps": [
+        {
+          "module": "i2c",
+          "type": "internal"
+        },
+        {
+          "module": "sensor",
+          "type": "external"
+        }
+      ],
+      "data_contracts": [
+        {
+          "kind": "typedef",
+          "name": "pressure_reading_t",
+          "definition": "typedef struct {\n    uint32_t pascal;\n    uint8_t  sensor_id;\n    uint8_t  valid;\n} pressure_reading_t;"
+        }
+      ],
+      "test_coverage": [
+        "test_pressure_sensor_init"
+      ]
+    },
+    {
+      "name": "temperature",
+      "header": "include/sensor/temperature.h",
+      "sources": [
+        "src/sensor/temperature.c"
+      ],
+      "north_interfaces": [
+        {
+          "function": "temp_sensor_init",
+          "signature": "int temp_sensor_init(uint8_t addr)",
+          "params": [
+            {
+              "name": "addr",
+              "type": "uint8_t",
+              "direction": "in"
+            }
+          ],
+          "return_type": "int",
+          "description": ""
+        },
+        {
+          "function": "temp_sensor_read",
+          "signature": "int temp_sensor_read(uint8_t addr, temp_reading_t *out)",
+          "params": [
+            {
+              "name": "addr",
+              "type": "uint8_t",
+              "direction": "in"
+            },
+            {
+              "name": "out",
+              "type": "temp_reading_t *",
+              "direction": "in"
+            }
+          ],
+          "return_type": "int",
+          "description": ""
+        },
+        {
+          "function": "temp_sensor_shutdown",
+          "signature": "void temp_sensor_shutdown(uint8_t addr)",
+          "params": [
+            {
+              "name": "addr",
+              "type": "uint8_t",
+              "direction": "in"
+            }
+          ],
+          "return_type": "void",
+          "description": ""
+        }
+      ],
+      "south_deps": [
+        {
+          "module": "i2c",
+          "type": "internal"
+        },
+        {
+          "module": "sensor",
+          "type": "external"
+        }
+      ],
+      "data_contracts": [
+        {
+          "kind": "typedef",
+          "name": "temp_reading_t",
+          "definition": "typedef struct {\n    int32_t  millidegrees;  /**< e.g. 25000 = 25.000 °C */\n    uint8_t  sensor_id;\n    uint8_t  valid;\n} temp_reading_t;"
+        }
+      ],
+      "test_coverage": [
+        "test_temp_sensor_init",
+        "test_temp_sensor_read_invalid_fd"
+      ]
+    }
+  ]
+}

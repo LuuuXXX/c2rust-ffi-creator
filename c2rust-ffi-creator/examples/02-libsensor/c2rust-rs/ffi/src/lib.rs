@@ -1,0 +1,11 @@
+//! c2rust-rs FFI 封装层
+//! 生成时间：2026-04-29T07:39:17Z
+//!
+//! # 顶层模块
+//! - `platform`
+//! - `sensor`
+//!
+//! 模块结构镜像原 C 项目的头文件目录层级。
+
+pub mod platform;
+pub mod sensor;

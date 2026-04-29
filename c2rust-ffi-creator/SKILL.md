@@ -98,12 +98,12 @@ description: 此技能应在用户需要将 C 项目迁移为 Rust FFI 封装层
 
 1. 根据 `spec.json` 中 `test_files` 字段定位原 C 测试文件（路径相对于 `.c2rust/c/`）。
 2. 对照每个 C 测试文件，在 `c2rust-rs/tests/` 下生成对应的 Rust 测试文件，文件名与原 C 测试文件保持一致（将 `.c` 替换为 `.rs`）。
-2. 遵循转换规则（详见 `references/test-conversion.md`）：
+3. 遵循转换规则（详见 `references/test-conversion.md`）：
    - `assert(expr)` → `assert!(expr)`
    - `assert_eq(a, b)` → `assert_eq!(a, b)`
    - C 字符串字面量 → `CString::new(...).unwrap()`
    - 内存分配 / 释放 → Rust 所有权语义或 `unsafe` 块
-3. 每个 Rust 测试函数保留原 C 测试函数名作为注释，便于追溯。
+4. 每个 Rust 测试函数保留原 C 测试函数名作为注释，便于追溯。
 
 ---
 

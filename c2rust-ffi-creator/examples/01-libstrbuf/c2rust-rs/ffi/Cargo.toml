@@ -1,0 +1,15 @@
+[package]
+name = "ffi"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "c2rust_ffi"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+hicc = { workspace = true }
+libc = { workspace = true }
+
+# [build-dependencies]
+# hicc-build = "0.2"  # 取消注释以在 build.rs 中编译 C 代码

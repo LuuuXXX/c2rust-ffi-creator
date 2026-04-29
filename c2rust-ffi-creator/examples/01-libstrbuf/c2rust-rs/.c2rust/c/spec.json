@@ -1,0 +1,123 @@
+{
+  "project": {
+    "name": "c2rust-rs",
+    "version": "0.1.0",
+    "build_system": "make",
+    "build_command": "make",
+    "test_command": "make test",
+    "output_artifacts": [],
+    "test_files": [
+      "tests/test_strbuf.c"
+    ]
+  },
+  "modules": [
+    {
+      "name": "strbuf",
+      "header": "include/strbuf.h",
+      "sources": [
+        "src/strbuf.c"
+      ],
+      "north_interfaces": [
+        {
+          "function": "strbuf_init",
+          "signature": "int strbuf_init(strbuf_t *buf, size_t initial_cap)",
+          "params": [
+            {
+              "name": "buf",
+              "type": "strbuf_t *",
+              "direction": "in"
+            },
+            {
+              "name": "initial_cap",
+              "type": "size_t",
+              "direction": "in"
+            }
+          ],
+          "return_type": "int",
+          "description": ""
+        },
+        {
+          "function": "strbuf_append",
+          "signature": "int strbuf_append(strbuf_t *buf, const char *str)",
+          "params": [
+            {
+              "name": "buf",
+              "type": "strbuf_t *",
+              "direction": "in"
+            },
+            {
+              "name": "str",
+              "type": "const char *",
+              "direction": "in"
+            }
+          ],
+          "return_type": "int",
+          "description": ""
+        },
+        {
+          "function": "strbuf_append_len",
+          "signature": "int strbuf_append_len(strbuf_t *buf, const char *data, size_t len)",
+          "params": [
+            {
+              "name": "buf",
+              "type": "strbuf_t *",
+              "direction": "in"
+            },
+            {
+              "name": "data",
+              "type": "const char *",
+              "direction": "in"
+            },
+            {
+              "name": "len",
+              "type": "size_t",
+              "direction": "in"
+            }
+          ],
+          "return_type": "int",
+          "description": ""
+        },
+        {
+          "function": "strbuf_reset",
+          "signature": "void strbuf_reset(strbuf_t *buf)",
+          "params": [
+            {
+              "name": "buf",
+              "type": "strbuf_t *",
+              "direction": "in"
+            }
+          ],
+          "return_type": "void",
+          "description": ""
+        },
+        {
+          "function": "strbuf_free",
+          "signature": "void strbuf_free(strbuf_t *buf)",
+          "params": [
+            {
+              "name": "buf",
+              "type": "strbuf_t *",
+              "direction": "in"
+            }
+          ],
+          "return_type": "void",
+          "description": ""
+        }
+      ],
+      "south_deps": [],
+      "data_contracts": [
+        {
+          "kind": "typedef",
+          "name": "strbuf_t",
+          "definition": "typedef struct {\n    char   *data;   /**< null-terminated character data */\n    size_t  len;    /**< current length (bytes, excluding NUL) */\n    size_t  cap;    /**< allocated capacity (bytes) */\n} strbuf_t;"
+        }
+      ],
+      "test_coverage": [
+        "test_strbuf_init_success",
+        "test_strbuf_append",
+        "test_strbuf_append_grows",
+        "test_strbuf_reset"
+      ]
+    }
+  ]
+}

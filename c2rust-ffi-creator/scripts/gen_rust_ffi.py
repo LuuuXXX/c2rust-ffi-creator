@@ -75,14 +75,14 @@ def build_module_tree(all_module_paths: list) -> dict:
 # ──────────────────────────────────────────────
 
 C_TO_RUST = {
-    "int":           "std::ffi::c_int",
-    "unsigned int":  "std::ffi::c_uint",
-    "long":          "std::ffi::c_long",
-    "unsigned long": "std::ffi::c_ulong",
-    "short":         "std::ffi::c_short",
-    "char":          "std::ffi::c_char",
-    "float":         "std::ffi::c_float",
-    "double":        "std::ffi::c_double",
+    "int":           "c_int",
+    "unsigned int":  "c_uint",
+    "long":          "c_long",
+    "unsigned long": "c_ulong",
+    "short":         "c_short",
+    "char":          "c_char",
+    "float":         "c_float",
+    "double":        "c_double",
     "void":          "()",
     "size_t":        "usize",
     "ssize_t":       "isize",
@@ -117,9 +117,9 @@ def map_c_type(c_type: str) -> str:
 
     if is_ptr:
         if is_const:
-            return f"*const {rust_base}" if rust_base != "()" else "*const std::ffi::c_void"
+            return f"*const {rust_base}" if rust_base != "()" else "*const c_void"
         else:
-            return f"*mut {rust_base}" if rust_base != "()" else "*mut std::ffi::c_void"
+            return f"*mut {rust_base}" if rust_base != "()" else "*mut c_void"
     return rust_base
 
 
@@ -234,10 +234,6 @@ def update_lib_rs(src_dir: Path, module_tree: dict, timestamp: str):
 
 
 # ──────────────────────────────────────────────
-# 解析 interfaces.md
-# ──────────────────────────────────────────────
-
-# ──────────────────────────────────────────────
 # 解析输入：spec.json（推荐）或 interfaces.md（兼容）
 # ──────────────────────────────────────────────
 
@@ -308,7 +304,10 @@ def _parse_params_simple(params_raw: str) -> list:
         tokens = p.rsplit(None, 1)
         if len(tokens) == 2:
             ptype, pname = tokens
-            pname = pname.lstrip("*")
+            # 指针符号可能附在变量名前（如 int *ptr）——将其归还给类型
+            while pname.startswith("*"):
+                ptype = ptype + " *"
+                pname = pname[1:]
         else:
             ptype, pname = p, ""
         params.append({"name": pname, "type": ptype.strip(), "direction": "in"})
@@ -358,6 +357,15 @@ def gen_ffi(input_path: str, output_src_dir: str):
 
     # 构建模块树（用于生成 lib.rs 和各级 mod.rs）
     module_tree = build_module_tree(module_paths)
+
+    # 检测 leaf 名称与中间层目录名冲突（e.g. net/io.h + net/io/buffered.h）
+    intermediate_paths = {parent for parent in module_tree if parent}
+    for mod in modules:
+        parts = mod["_rust_path"]
+        if tuple(parts) in intermediate_paths:
+            print(f"⚠ 警告：模块路径 {'/'.join(parts)} 既是叶子又是中间目录前缀，"
+                  f"将生成冲突的 {'/'.join(parts)}.rs 与 {'/'.join(parts)}/mod.rs。"
+                  f"请人工重命名对应 C 头文件或模块。")
 
     # 生成各叶子模块的 .rs 文件
     for mod in modules:
