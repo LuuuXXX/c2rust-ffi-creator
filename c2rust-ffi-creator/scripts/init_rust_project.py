@@ -65,14 +65,14 @@ BUILD_RS = """\
 //
 // 启用步骤：
 //   1. 在 ffi/Cargo.toml 的 [build-dependencies] 中添加：
-//          cc = "1"
+//          hicc-build = "0.2"
 //   2. 将下方占位路径替换为 spec.json sources[] 中的实际路径
 //      （禁止假设 src/ / include/ 等固定层级；路径须与原 C 项目目录树一致）
 //   3. 删除外层 /* ... */ 注释，使代码生效
 //
 // /*
 // fn main() {
-//     cc::Build::new()
+//     hicc_build::Build::new()
 //         .file("../.c2rust/c/<path/to/foo.c>")   // 替换为实际源文件路径
 //         .include("../.c2rust/c/<path/to/includes>")
 //         .compile("c2rust_c_core");

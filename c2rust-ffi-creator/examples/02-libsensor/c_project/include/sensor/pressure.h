@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** Pressure reading in Pascal. */
 typedef struct {
     uint32_t pascal;
@@ -18,5 +22,9 @@ int pressure_sensor_read(uint8_t addr, pressure_reading_t *out);
 
 /** Shut down the sensor. */
 void pressure_sensor_shutdown(uint8_t addr);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif /* SENSOR_PRESSURE_H */

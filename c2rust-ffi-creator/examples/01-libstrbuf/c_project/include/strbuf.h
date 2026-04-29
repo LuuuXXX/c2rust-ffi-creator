@@ -3,6 +3,10 @@
 
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * A growable string buffer.
  */
@@ -26,5 +30,9 @@ void strbuf_reset(strbuf_t *buf);
 
 /** Free allocated memory and zero-out the struct. */
 void strbuf_free(strbuf_t *buf);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif /* STRBUF_H */

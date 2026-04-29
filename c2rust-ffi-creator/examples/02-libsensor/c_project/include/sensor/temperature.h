@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** Temperature reading in millidegrees Celsius. */
 typedef struct {
     int32_t  millidegrees;  /**< e.g. 25000 = 25.000 °C */
@@ -18,5 +22,9 @@ int temp_sensor_read(uint8_t addr, temp_reading_t *out);
 
 /** Shut down the sensor. */
 void temp_sensor_shutdown(uint8_t addr);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif /* SENSOR_TEMPERATURE_H */

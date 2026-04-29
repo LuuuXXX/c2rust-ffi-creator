@@ -93,7 +93,7 @@ description: 此技能应在用户需要将 C 项目迁移为 Rust FFI 封装层
 2. **人工审核生成的 Rust 文件**，重点检查：
    - 将自动生成的不透明占位结构体（`pub struct FooT { _opaque: [u8; 0] }`）替换为与 C 端
      内存布局完全一致的 `#[repr(C)]` 定义（参考 `spec.json` 中 `data_contracts` 字段）。
-   - 在 `ffi/Cargo.toml` 的 `[build-dependencies]` 中添加 `cc = "1"`。
+   - 在 `ffi/Cargo.toml` 的 `[build-dependencies]` 中添加 `hicc-build = "0.2"`。
    - 在 `ffi/build.rs` 中启用 C 编译（按模板注释操作，路径与 `spec.json sources[]` 一致）。
    - 所有裸指针操作须包裹在 `unsafe` 块中，并添加安全注释。
 

@@ -4,7 +4,7 @@
 // 与 spec.json sources[] 字段中的路径保持一致。
 
 fn main() {
-    cc::Build::new()
+    hicc_build::Build::new()
         .file("../.c2rust/c/src/strbuf.c")
         .include("../.c2rust/c/include")
         .compile("strbuf");
