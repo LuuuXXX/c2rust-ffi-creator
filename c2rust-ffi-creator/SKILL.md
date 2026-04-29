@@ -18,7 +18,7 @@ description: 此技能应在用户需要将 C 项目迁移为 Rust FFI 封装层
 ### 阶段一：创建 c2rust-rs 项目骨架
 
 1. 在工作目录下创建名为 `c2rust-rs` 的新目录。
-2. 运行 `scripts/init_rust_project.sh c2rust-rs` 生成标准目录结构：
+2. 运行 `scripts/init_rust_project.py c2rust-rs` 生成标准目录结构：
    ```
    c2rust-rs/
    ├── Cargo.toml          # 工作空间 manifest
@@ -115,7 +115,7 @@ description: 此技能应在用户需要将 C 项目迁移为 Rust FFI 封装层
 
 ## 资源
 
-- `scripts/init_rust_project.sh` — 初始化 c2rust-rs 项目目录结构
+- `scripts/init_rust_project.py` — 初始化 c2rust-rs 项目目录结构
 - `scripts/analyze_c_project.py` — 分析 C 项目，生成 spec.json
 - `scripts/gen_rust_ffi.py` — 基于接口清单生成 Rust FFI 骨架代码
 - `scripts/verify_symbols.sh` — 对比 C/Rust 导出符号表

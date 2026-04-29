@@ -51,7 +51,8 @@ def map_c_type(c_type: str) -> str:
     is_ptr = "*" in c_type
     is_const = "const" in c_type
 
-    base = c_type.replace("const", "").replace("*", "").replace("unsigned", "unsigned ").strip()
+    base = c_type.replace("const", "").replace("*", "").strip()
+    # Normalize multiple spaces
     base = re.sub(r'\s+', ' ', base)
 
     rust_base = C_TO_RUST.get(base)

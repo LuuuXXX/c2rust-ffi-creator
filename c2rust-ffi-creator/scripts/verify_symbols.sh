@@ -34,7 +34,7 @@ echo "✓ 构建完成"
 echo ""
 echo "[2/4] 提取 Rust 产物导出符号..."
 
-RUST_LIB_SO=$(find "${RUST_TARGET}" -maxdepth 1 -name "libc2rust_ffi.so" -o -name "libc2rust_ffi.dylib" 2>/dev/null | head -1 || true)
+RUST_LIB_SO=$(find "${RUST_TARGET}" -maxdepth 1 \( -name "libc2rust_ffi.so" -o -name "libc2rust_ffi.dylib" \) 2>/dev/null | head -1 || true)
 RUST_LIB_A=$(find "${RUST_TARGET}" -maxdepth 1 -name "libc2rust_ffi.a" 2>/dev/null | head -1 || true)
 
 if [[ -n "${RUST_LIB_SO}" ]]; then
