@@ -28,6 +28,30 @@ from datetime import datetime, timezone
 # 仅作为"顶层前缀"剥离的目录名（不代表模块，只是放头文件用的）
 _STRIP_TOPLEVEL = {"include", "includes", "inc", "headers", "header", "public", "pub", "api", "src"}
 
+# Rust 保留关键字（不能直接作为模块名）
+_RUST_KEYWORDS = {
+    "as", "break", "const", "continue", "crate", "else", "enum", "extern",
+    "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod",
+    "move", "mut", "pub", "ref", "return", "self", "Self", "static", "struct",
+    "super", "trait", "true", "type", "unsafe", "use", "where", "while",
+    "abstract", "become", "box", "do", "final", "macro", "override", "priv",
+    "typeof", "unsized", "virtual", "yield", "async", "await", "dyn", "try",
+}
+
+
+def _normalize_part(part: str) -> str:
+    """Ensure a single path component is a valid Rust module identifier.
+
+    1. Prefix with '_' if the component starts with a digit.
+    2. Append '_' if the component is a Rust keyword (raw identifiers r# are not
+       valid in module paths, so we use a trailing underscore instead).
+    """
+    if len(part) > 0 and part[0].isdigit():
+        part = "_" + part
+    if part in _RUST_KEYWORDS:
+        part = part + "_"
+    return part
+
 
 def header_to_module_path(header: str) -> list:
     """
@@ -37,6 +61,7 @@ def header_to_module_path(header: str) -> list:
     1. 剥离 .h 后缀
     2. 若第一个目录名是纯容器（include/src/inc/…），则剥离它
     3. 将路径中的连字符替换为下划线（Rust 标识符要求）
+    4. 数字开头的组件前缀 `_`；Rust 关键字组件追加 `_`
 
     示例：
       "include/foo.h"            → ["foo"]
@@ -44,6 +69,8 @@ def header_to_module_path(header: str) -> list:
       "src/lib/net/tcp.h"        → ["lib", "net", "tcp"]
       "lib/platform/linux/io.h"  → ["lib", "platform", "linux", "io"]
       "utils.h"                  → ["utils"]
+      "include/1util.h"          → ["_1util"]
+      "include/mod.h"            → ["mod_"]
     """
     p = Path(header)
     parts = list(p.with_suffix("").parts)
@@ -51,29 +78,9 @@ def header_to_module_path(header: str) -> list:
     if parts and parts[0].lower() in _STRIP_TOPLEVEL:
         parts = parts[1:]
 
-    parts = [re.sub(r"[^a-zA-Z0-9_]", "_", part) for part in parts if part]
+    parts = [_normalize_part(re.sub(r"[^a-zA-Z0-9_]", "_", part)) for part in parts if part]
 
-    # Ensure each part is a valid Rust identifier:
-    # 1. Prefix with '_' if it starts with a digit
-    # 2. Append '_' if it is a Rust keyword (raw identifiers r# are not valid in mod paths)
-    _RUST_KEYWORDS = {
-        "as", "break", "const", "continue", "crate", "else", "enum", "extern",
-        "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod",
-        "move", "mut", "pub", "ref", "return", "self", "Self", "static", "struct",
-        "super", "trait", "true", "type", "unsafe", "use", "where", "while",
-        "abstract", "become", "box", "do", "final", "macro", "override", "priv",
-        "typeof", "unsized", "virtual", "yield", "async", "await", "dyn", "try",
-    }
-    normalized = []
-    for part in parts:
-        if part[0].isdigit():
-            part = "_" + part
-        if part in _RUST_KEYWORDS:
-            part = part + "_"
-        normalized.append(part)
-    parts = normalized
-
-    return parts if parts else [re.sub(r"[^a-zA-Z0-9_]", "_", p.stem)]
+    return parts if parts else [_normalize_part(re.sub(r"[^a-zA-Z0-9_]", "_", p.stem))]
 
 
 def build_module_tree(all_module_paths: list) -> dict:

@@ -30,7 +30,7 @@ def find_files(base: Path, exts):
 
 def extract_functions_from_header(header: Path):
     """从头文件中提取函数声明（公开 API）。"""
-    text = header.read_text(errors="replace")
+    text = header.read_text(encoding="utf-8", errors="replace")
     # 匹配函数声明：返回类型 + 函数名 + 参数列表 + ;
     pattern = re.compile(
         r'(?:extern\s+)?'
@@ -90,7 +90,7 @@ def _parse_params(params_raw: str):
 
 def extract_structs_enums(header: Path):
     """从头文件提取结构体、枚举、typedef 定义。"""
-    text = header.read_text(errors="replace")
+    text = header.read_text(encoding="utf-8", errors="replace")
     contracts = []
 
     # struct / enum / union
@@ -129,7 +129,7 @@ def find_south_deps(src_files, all_module_names, mod_name=None):
     deps = set()
     ext_libs = set()
     for src in src_files:
-        text = src.read_text(errors="replace")
+        text = src.read_text(encoding="utf-8", errors="replace")
         for inc in re.findall(r'#include\s+[<"]([^>"]+)[>"]', text):
             stem = Path(inc).stem
             # 跳过自包含头文件，避免将父目录误判为外部依赖
@@ -150,7 +150,7 @@ def find_test_coverage_in_files(test_files: list, module_name: str):
     """从已识别的测试文件列表中找出覆盖某模块的测试函数。"""
     covered = []
     for tf in test_files:
-        text = tf.read_text(errors="replace")
+        text = tf.read_text(encoding="utf-8", errors="replace")
         if module_name not in text and module_name.replace("_", "") not in text:
             continue
         for m in re.finditer(r'void\s+(test_\w+)\s*\(', text):
@@ -178,10 +178,6 @@ _TEST_FILE_RE = re.compile(
     re.IGNORECASE,
 )
 _TEST_DIR_NAMES = {"test", "tests", "check", "checks", "spec", "specs", "unittest", "unittests"}
-
-# 分析产物文件名（不应被当作 C 源码扫描）
-_SKIP_FILENAMES = {"spec.json", "interfaces.md", "symbols_expected.txt", "README.md"}
-
 
 def _is_test_file(path: Path) -> bool:
     """根据文件名或父目录名判断是否为测试文件。"""

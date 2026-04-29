@@ -14,8 +14,10 @@
     "name": "string",            // 项目名称
     "version": "string",         // 版本号（从 Makefile 或 configure.ac 提取）
     "build_system": "make|cmake|autoconf",
-    "build_command": ["make", "all"],  // 构建命令，JSON 数组（argv 形式），例如 ["make", "all"] 或 ["cmake", "--build", "."]
-    "test_command": "string",    // 完整测试命令，例如 "make test"
+    "build_command": ["make", "all"],  // 构建命令，JSON 数组（argv 形式）或字符串；
+                                        // 数组格式（推荐）：["make", "all"] 或 ["cmake", "--build", "."]
+                                        // 字符串格式（兼容）：含 && 的多步命令，如 "cmake -B build && cmake --build build"
+    "test_command": ["make", "test"],   // 测试命令，同上：JSON 数组（推荐）或字符串，例如 ["make", "test"]
     "output_artifacts": [        // 构建产物路径列表（相对于 .c2rust/c/，由 verify_symbols.sh 读取）
       "libfoo.a",               // 例如静态库
       "libfoo.so"               // 例如动态库（可省略，脚本会自动扫描回退）

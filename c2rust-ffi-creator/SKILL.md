@@ -105,13 +105,14 @@ description: 此技能应在用户需要将 C 项目迁移为 Rust FFI 封装层
 ### 阶段五：转换 C 测试为 Rust 测试
 
 1. 根据 `spec.json` 中 `test_files` 字段定位原 C 测试文件（路径相对于 `.c2rust/c/`）。
-2. 对照每个 C 测试文件，在 `c2rust-rs/ffi/tests/` 下生成对应的 Rust 测试文件，文件名与原 C 测试文件保持一致（将 `.c` 替换为 `.rs`）。
-3. 遵循转换规则（详见 `references/test-conversion.md`）：
+2. **默认推荐使用集成测试**：对照每个 C 测试文件，在 `c2rust-rs/ffi/tests/` 下生成对应的 Rust 测试文件，文件名与原 C 测试文件保持一致（将 `.c` 替换为 `.rs`）。
+   **若示例工程或模块封装方式更适合单元测试，也允许放在 `ffi/src/**.rs` 的 `#[cfg(test)] mod tests` 中**；此时应在测试模块注释中标明对应的原 C 测试文件路径，确保与 `spec.json.test_files` 可追溯映射。
+3. 遵循转换规则（详见 `references/test-conversion.md`）；以下规则同时适用于 `ffi/tests/*.rs` 集成测试与 `ffi/src/**.rs` 中的单元测试：
    - `assert(expr)` → `assert!(expr)`
    - `assert_eq(a, b)` → `assert_eq!(a, b)`
    - C 字符串字面量 → `CString::new(...).unwrap()`
    - 内存分配 / 释放 → Rust 所有权语义或 `unsafe` 块
-4. 每个 Rust 测试函数保留原 C 测试函数名作为注释，便于追溯。
+4. 每个 Rust 测试函数保留原 C 测试函数名作为注释，便于追溯；若采用单元测试组织方式，额外在测试模块顶部注明对应原 C 测试文件名。
 
 ---
 

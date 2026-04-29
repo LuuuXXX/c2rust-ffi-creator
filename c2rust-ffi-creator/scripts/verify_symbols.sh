@@ -54,7 +54,8 @@ if [[ ! -f "${EXPECTED_FILE}" ]]; then
         exit 1
     fi
 
-    # 在 C 目录内执行构建（build_command 须为 JSON 数组，由 Python 直接调用以避免 shell 注入）
+    # 在 C 目录内执行构建（build_command 推荐为 JSON 数组；字符串格式（可含 && 等 shell 运算符）
+    # 将通过 bash -lc 执行以保持兼容性）
     python3 - "${SPEC_JSON}" "${C_DIR}" <<'PYEOF'
 import json, sys, subprocess, os
 
@@ -63,20 +64,24 @@ c_dir     = sys.argv[2]
 with open(spec_json, encoding="utf-8") as f:
     d = json.load(f)
 cmd = d["project"]["build_command"]
-if isinstance(cmd, str):
-    # 兼容旧字符串格式，按空格分割（不含特殊 shell 字符时安全）
-    import shlex
-    cmd = shlex.split(cmd)
-print(f"  C 构建命令：{cmd}")
+if isinstance(cmd, list):
+    # JSON 数组：直接作为 argv 调用，安全
+    shell_cmd = cmd
+    use_shell = False
+else:
+    # 字符串格式：通过 bash -lc 执行，支持 && 等多步命令
+    shell_cmd = ["bash", "-lc", cmd]
+    use_shell = False
+print(f"  C 构建命令：{shell_cmd}")
 os.chdir(c_dir)
-result = subprocess.run(cmd)
+result = subprocess.run(shell_cmd, shell=use_shell)
 sys.exit(result.returncode)
 PYEOF
 
     # 优先从 spec.json output_artifacts 字段获取预期产物路径（将路径作为参数传给 Python）
     ARTIFACTS_JSON=$(python3 -c "
 import json, sys
-d = json.load(open(sys.argv[1]))
+d = json.load(open(sys.argv[1], encoding='utf-8'))
 arts = d.get('project', {}).get('output_artifacts', [])
 print('\n'.join(arts))
 " "${SPEC_JSON}" 2>/dev/null || true)
@@ -165,8 +170,21 @@ echo "✓ 构建完成"
 echo ""
 echo "[2/4] 提取 Rust 产物导出符号..."
 
-RUST_LIB_SO=$(find "${RUST_TARGET}" -maxdepth 1 \( -name "libc2rust_ffi.so" -o -name "libc2rust_ffi.dylib" \) 2>/dev/null | head -1 || true)
-RUST_LIB_A=$(find "${RUST_TARGET}" -maxdepth 1 -name "libc2rust_ffi.a" 2>/dev/null | head -1 || true)
+# 从 ffi/Cargo.toml 动态读取 [lib] name，回退到 c2rust_ffi
+FFI_CARGO="${PROJECT_ROOT}/ffi/Cargo.toml"
+if [[ -f "${FFI_CARGO}" ]]; then
+    RUST_LIB_NAME=$(python3 -c "
+import sys, re
+txt = open(sys.argv[1], encoding='utf-8').read()
+m = re.search(r'\[lib\].*?^name\s*=\s*[\"\']([\w-]+)[\"\']', txt, re.DOTALL | re.MULTILINE)
+print(m.group(1).replace('-', '_') if m else 'c2rust_ffi')
+" "${FFI_CARGO}" 2>/dev/null || echo "c2rust_ffi")
+else
+    RUST_LIB_NAME="c2rust_ffi"
+fi
+
+RUST_LIB_SO=$(find "${RUST_TARGET}" -maxdepth 1 \( -name "lib${RUST_LIB_NAME}.so" -o -name "lib${RUST_LIB_NAME}.dylib" \) 2>/dev/null | head -1 || true)
+RUST_LIB_A=$(find "${RUST_TARGET}" -maxdepth 1 -name "lib${RUST_LIB_NAME}.a" 2>/dev/null | head -1 || true)
 
 if [[ -n "${RUST_LIB_SO}" ]]; then
     echo "  使用动态库：${RUST_LIB_SO}"
@@ -181,7 +199,8 @@ elif [[ -n "${RUST_LIB_A}" ]]; then
         | grep -v '^$' \
         | sort -u > "${TMP_RUST_SYMBOLS}"
 else
-    echo "✗ 错误：在 ${RUST_TARGET} 中未找到 libc2rust_ffi.so 或 libc2rust_ffi.a"
+    echo "✗ 错误：在 ${RUST_TARGET} 中未找到 lib${RUST_LIB_NAME}.so 或 lib${RUST_LIB_NAME}.a"
+    echo "  （lib 名称读取自 ffi/Cargo.toml [lib] name；若已修改库名，请确保构建后产物存在）"
     exit 1
 fi
 
