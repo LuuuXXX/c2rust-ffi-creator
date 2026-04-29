@@ -108,4 +108,29 @@ jobs:
       # ── Validate skill structure ─────────────────────────────────────────
       - name: Validate r2rust-ffi-creator skill
         run: |
-          python3 skill-creator-cn/quick_validate.py r2rust-ffi-creator
+          python3 - r2rust-ffi-creator << 'EOF'
+          import sys, re
+          from pathlib import Path
+
+          skill_path = Path(sys.argv[1])
+          skill_md = skill_path / 'SKILL.md'
+          if not skill_md.exists():
+              print("FAIL: SKILL.md not found"); sys.exit(1)
+          content = skill_md.read_text()
+          if not content.startswith('---'):
+              print("FAIL: Missing YAML frontmatter"); sys.exit(1)
+          match = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
+          if not match:
+              print("FAIL: Invalid frontmatter format"); sys.exit(1)
+          fm = match.group(1)
+          if 'name:' not in fm:
+              print("FAIL: Missing 'name' in frontmatter"); sys.exit(1)
+          if 'description:' not in fm:
+              print("FAIL: Missing 'description' in frontmatter"); sys.exit(1)
+          name_match = re.search(r'name:\s*(.+)', fm)
+          if name_match:
+              name = name_match.group(1).strip()
+              if not re.match(r'^[a-z0-9-]+$', name):
+                  print(f"FAIL: Invalid name '{name}'"); sys.exit(1)
+          print(f"PASS: Skill '{skill_path.name}' validation passed")
+          EOF
