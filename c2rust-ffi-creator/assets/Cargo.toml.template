@@ -1,0 +1,12 @@
+[workspace]
+members = ["ffi"]
+resolver = "2"
+
+[workspace.dependencies]
+hicc = "0.2"
+libc = "0.2"
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = "symbols"

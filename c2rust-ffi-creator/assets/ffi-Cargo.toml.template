@@ -1,0 +1,18 @@
+[package]
+name = "ffi"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+# 产物名称：根据原 C 项目库名修改（去掉 "lib" 前缀）
+# 例如：原 C 库为 libfoo.so → name = "foo"
+name = "c2rust_ffi"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+hicc = { workspace = true }
+libc = { workspace = true }
+
+# 如需将 C 源码编译进 Rust 产物，启用以下配置：
+# [build-dependencies]
+# hicc-build = "0.2"
