@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """
-基于 interfaces.md（或 spec.json）生成 Rust FFI 骨架代码。
+基于 spec.json（或 interfaces.md 兼容模式）生成 Rust FFI 骨架代码。
+
+生成的 Rust 模块结构镜像原 C 项目的头文件目录层级，便于大型项目导航。
 
 用法：
-    python scripts/gen_rust_ffi.py <interfaces_md> <output_src_dir>
+    python scripts/gen_rust_ffi.py <spec_json_or_interfaces_md> <output_src_dir>
 
-示例：
+示例（推荐，保留目录层级）：
+    python scripts/gen_rust_ffi.py .c2rust/c/spec.json ffi/src
+
+示例（兼容模式，平铺）：
     python scripts/gen_rust_ffi.py .c2rust/c/interfaces.md ffi/src
 """
 
@@ -13,7 +18,57 @@ import sys
 import re
 import json
 from pathlib import Path
+from collections import defaultdict
 from datetime import datetime, timezone
+
+# ──────────────────────────────────────────────
+# 模块路径推导：从头文件路径映射到 Rust 模块层级
+# ──────────────────────────────────────────────
+
+# 仅作为"顶层前缀"剥离的目录名（不代表模块，只是放头文件用的）
+_STRIP_TOPLEVEL = {"include", "includes", "inc", "headers", "header", "public", "pub", "api", "src"}
+
+
+def header_to_module_path(header: str) -> list:
+    """
+    将头文件相对路径转换为 Rust 模块路径组件列表。
+
+    规则：
+    1. 剥离 .h 后缀
+    2. 若第一个目录名是纯容器（include/src/inc/…），则剥离它
+    3. 将路径中的连字符替换为下划线（Rust 标识符要求）
+
+    示例：
+      "include/foo.h"            → ["foo"]
+      "include/crypto/aes.h"     → ["crypto", "aes"]
+      "src/lib/net/tcp.h"        → ["lib", "net", "tcp"]
+      "lib/platform/linux/io.h"  → ["lib", "platform", "linux", "io"]
+      "utils.h"                  → ["utils"]
+    """
+    p = Path(header)
+    parts = list(p.with_suffix("").parts)
+
+    if parts and parts[0].lower() in _STRIP_TOPLEVEL:
+        parts = parts[1:]
+
+    parts = [re.sub(r"[^a-zA-Z0-9_]", "_", part) for part in parts if part]
+
+    return parts if parts else [re.sub(r"[^a-zA-Z0-9_]", "_", p.stem)]
+
+
+def build_module_tree(all_module_paths: list) -> dict:
+    """
+    构建层级树：parent_path_tuple → set(直接子模块名)
+
+    用于生成 lib.rs 和各级 mod.rs 的 `pub mod` 声明。
+    """
+    tree = defaultdict(set)
+    for parts in all_module_paths:
+        for i in range(len(parts)):
+            parent = tuple(parts[:i])
+            tree[parent].add(parts[i])
+    return tree
+
 
 # ──────────────────────────────────────────────
 # C 类型 → Rust 类型映射
@@ -68,11 +123,12 @@ def map_c_type(c_type: str) -> str:
     return rust_base
 
 
-def gen_module_rs(mod_name: str, interfaces: list, timestamp: str) -> str:
+def gen_module_rs(mod_name: str, interfaces: list, timestamp: str, original_header: str = "") -> str:
     """为一个 C 模块生成对应的 Rust FFI 模块文件内容。"""
+    header_comment = f"//! 原 C 头文件：{original_header}" if original_header else f"//! 原 C 模块：{mod_name}"
     lines = [
         f"//! FFI 封装：{mod_name} 模块",
-        f"//! 原 C 头文件：<模块目录>/include/{mod_name}.h",
+        header_comment,
         f"//! 生成时间：{timestamp}",
         f"//! 警告：此文件由 gen_rust_ffi.py 自动生成，请在人工审核后修改。",
         "",
@@ -131,16 +187,45 @@ def _build_rust_params(params: list) -> str:
     return ", ".join(parts)
 
 
-def update_lib_rs(src_dir: Path, module_names: list, timestamp: str):
-    """更新 lib.rs，添加模块声明。"""
+def write_mod_rs_files(src_dir: Path, module_tree: dict, timestamp: str):
+    """
+    为每个中间层目录写入 mod.rs，声明其直接子模块。
+    仅写入有子模块的中间层（叶子节点由调用方直接生成 .rs 文件）。
+    """
+    # tree 的 key 是 parent_tuple；() 表示顶层（对应 lib.rs，单独处理）
+    for parent_tuple, children in sorted(module_tree.items()):
+        if not parent_tuple:
+            continue  # 顶层由 update_lib_rs 负责
+        # 检查这个父目录是否真的需要 mod.rs
+        # （当 children 集合非空，说明 parent_tuple 对应一个目录而非叶子）
+        dir_path = src_dir / Path(*parent_tuple)
+        dir_path.mkdir(parents=True, exist_ok=True)
+        mod_decls = "\n".join(f"pub mod {c};" for c in sorted(children))
+        mod_rs_content = (
+            f"//! 子模块：{' > '.join(parent_tuple)}\n"
+            f"//! 生成时间：{timestamp}\n"
+            f"\n"
+            f"{mod_decls}\n"
+        )
+        mod_rs_path = dir_path / "mod.rs"
+        mod_rs_path.write_text(mod_rs_content)
+        print(f"✓ 已生成 {mod_rs_path.relative_to(src_dir.parent.parent)}")
+
+
+def update_lib_rs(src_dir: Path, module_tree: dict, timestamp: str):
+    """更新 lib.rs，仅声明顶层模块（由 build_module_tree 的 () key 给出）。"""
     lib_path = src_dir / "lib.rs"
-    mod_decls = "\n".join(f"pub mod {m};" for m in module_names)
+    top_modules = sorted(module_tree.get((), set()))
+    mod_decls = "\n".join(f"pub mod {m};" for m in top_modules)
+    module_list = "\n".join(f"//! - `{m}`" for m in top_modules)
     content = (
         f"//! c2rust-rs FFI 封装层\n"
         f"//! 生成时间：{timestamp}\n"
         f"//!\n"
-        f"//! # 模块列表\n"
-        f"{chr(10).join('//! - ' + m for m in module_names)}\n"
+        f"//! # 顶层模块\n"
+        f"{module_list}\n"
+        f"//!\n"
+        f"//! 模块结构镜像原 C 项目的头文件目录层级。\n"
         f"\n"
         f"{mod_decls}\n"
     )
@@ -152,8 +237,29 @@ def update_lib_rs(src_dir: Path, module_names: list, timestamp: str):
 # 解析 interfaces.md
 # ──────────────────────────────────────────────
 
+# ──────────────────────────────────────────────
+# 解析输入：spec.json（推荐）或 interfaces.md（兼容）
+# ──────────────────────────────────────────────
+
+def parse_spec_json(spec_path: Path) -> list:
+    """
+    从 spec.json 读取模块信息，保留 header 路径用于推导 Rust 模块层级。
+
+    返回每个模块的 dict，包含 name、header、north_interfaces 字段。
+    """
+    data = json.loads(spec_path.read_text())
+    modules = []
+    for mod in data.get("modules", []):
+        modules.append({
+            "name": mod.get("name", "unknown"),
+            "header": mod.get("header", ""),
+            "north_interfaces": mod.get("north_interfaces", []),
+        })
+    return modules
+
+
 def parse_interfaces_md(md_path: Path) -> list:
-    """从 interfaces.md 提取模块和接口信息（简单解析）。"""
+    """从 interfaces.md 提取模块和接口信息（兼容模式，不含路径信息）。"""
     text = md_path.read_text()
     modules = []
     current_mod = None
@@ -164,7 +270,7 @@ def parse_interfaces_md(md_path: Path) -> list:
         if m:
             if current_mod:
                 modules.append(current_mod)
-            current_mod = {"name": m.group(1), "north_interfaces": []}
+            current_mod = {"name": m.group(1), "header": "", "north_interfaces": []}
             continue
 
         if current_mod is None:
@@ -176,7 +282,6 @@ def parse_interfaces_md(md_path: Path) -> list:
             func_name = m.group(1)
             sig = m.group(2)
             ret_type = m.group(3)
-            # 解析参数（从签名中提取括号内内容）
             pm = re.search(r'\(([^)]*)\)', sig)
             params_raw = pm.group(1) if pm else ""
             params = _parse_params_simple(params_raw)
@@ -214,34 +319,70 @@ def _parse_params_simple(params_raw: str) -> list:
 # 主逻辑
 # ──────────────────────────────────────────────
 
-def gen_ffi(interfaces_md: str, output_src_dir: str):
-    md_path = Path(interfaces_md).resolve()
+def gen_ffi(input_path: str, output_src_dir: str):
+    in_path = Path(input_path).resolve()
     src_dir = Path(output_src_dir).resolve()
 
-    if not md_path.exists():
-        print(f"错误：interfaces.md 不存在：{md_path}")
+    if not in_path.exists():
+        print(f"错误：输入文件不存在：{in_path}")
         sys.exit(1)
 
     src_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    modules = parse_interfaces_md(md_path)
-    if not modules:
-        print("警告：未从 interfaces.md 中解析到任何模块，请检查文件格式。")
-        sys.exit(1)
+    # 选择解析器
+    if in_path.suffix == ".json":
+        modules = parse_spec_json(in_path)
+        if not modules:
+            print("警告：spec.json 中未找到任何模块（modules 为空）。")
+            sys.exit(1)
+        print(f"✓ 从 spec.json 读取 {len(modules)} 个模块（层级模式）")
+    else:
+        modules = parse_interfaces_md(in_path)
+        if not modules:
+            print("警告：未从 interfaces.md 中解析到任何模块，请检查文件格式。")
+            sys.exit(1)
+        print(f"✓ 从 interfaces.md 读取 {len(modules)} 个模块（兼容平铺模式）")
 
-    module_names = []
+    # 为每个模块推导 Rust 模块路径
+    module_paths = []
     for mod in modules:
-        mod_name = mod["name"]
-        module_names.append(mod_name)
-        content = gen_module_rs(mod_name, mod["north_interfaces"], timestamp)
-        out_file = src_dir / f"{mod_name}.rs"
+        header = mod.get("header", "")
+        if header:
+            path = header_to_module_path(header)
+        else:
+            # 无路径信息时，按模块名平铺
+            path = [re.sub(r"[^a-zA-Z0-9_]", "_", mod["name"])]
+        mod["_rust_path"] = path
+        module_paths.append(path)
+
+    # 构建模块树（用于生成 lib.rs 和各级 mod.rs）
+    module_tree = build_module_tree(module_paths)
+
+    # 生成各叶子模块的 .rs 文件
+    for mod in modules:
+        parts = mod["_rust_path"]
+        mod_name = parts[-1]
+        # 叶子文件路径：src_dir / part0 / part1 / ... / leaf.rs
+        out_file = src_dir / Path(*parts[:-1], f"{mod_name}.rs") if len(parts) > 1 else src_dir / f"{mod_name}.rs"
+        out_file.parent.mkdir(parents=True, exist_ok=True)
+
+        content = gen_module_rs(mod_name, mod["north_interfaces"], timestamp, mod.get("header", ""))
         out_file.write_text(content)
-        print(f"✓ 已生成 {out_file.relative_to(src_dir.parent.parent) if src_dir.parent.parent.exists() else out_file}")
+        rust_path = "::".join(parts)
+        try:
+            display = out_file.relative_to(src_dir.parent.parent)
+        except ValueError:
+            display = out_file
+        print(f"✓ 已生成 {display}  （Rust 路径：{rust_path}）")
 
-    update_lib_rs(src_dir, module_names, timestamp)
+    # 生成中间层 mod.rs 文件
+    write_mod_rs_files(src_dir, module_tree, timestamp)
 
-    print(f"\n共生成 {len(modules)} 个模块文件。")
+    # 更新 lib.rs（仅顶层模块）
+    update_lib_rs(src_dir, module_tree, timestamp)
+
+    print(f"\n共生成 {len(modules)} 个叶子模块文件。")
     print("⚠ 请人工审核生成的 Rust 代码，特别是：")
     print("  - 不认识的 C 类型已被替换为 PascalCase 占位名，需手动补充 #[repr(C)] 定义")
     print("  - 函数封装层默认 1:1 透传，如需添加安全检查请手动修改")
@@ -250,7 +391,7 @@ def gen_ffi(interfaces_md: str, output_src_dir: str):
 
 def main():
     if len(sys.argv) != 3:
-        print("用法：python scripts/gen_rust_ffi.py <interfaces_md> <output_src_dir>")
+        print("用法：python scripts/gen_rust_ffi.py <spec_json_or_interfaces_md> <output_src_dir>")
         sys.exit(1)
     gen_ffi(sys.argv[1], sys.argv[2])
 

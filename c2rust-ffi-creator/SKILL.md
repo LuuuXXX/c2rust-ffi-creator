@@ -66,9 +66,26 @@ description: 此技能应在用户需要将 C 项目迁移为 Rust FFI 封装层
 
 ### 阶段四：使用 hicc 生成 Rust FFI 封装层
 
-1. 运行 `scripts/gen_rust_ffi.py c2rust-rs/.c2rust/c/interfaces.md c2rust-rs/ffi/src` 生成：
-   - `lib.rs`：模块入口，`#[no_mangle]` + `extern "C"` 函数声明
-   - 每个模块对应一个 `<module>.rs` 文件
+1. 运行 `scripts/gen_rust_ffi.py c2rust-rs/.c2rust/c/spec.json c2rust-rs/ffi/src` 生成 Rust 模块骨架。
+
+   脚本根据 `spec.json` 中每个模块的 `header` 路径推导 Rust 模块层级，**生成的目录结构镜像原 C 项目的头文件目录**：
+
+   ```
+   # 例：C 项目有 include/crypto/aes.h、include/net/tcp.h
+   ffi/src/
+   ├── lib.rs            # pub mod crypto; pub mod net;
+   ├── crypto/
+   │   ├── mod.rs        # pub mod aes;
+   │   └── aes.rs        # extern "C" + pub unsafe extern "C" fn aes_*
+   └── net/
+       ├── mod.rs        # pub mod tcp;
+       └── tcp.rs        # extern "C" + pub unsafe extern "C" fn tcp_*
+   ```
+
+   - `lib.rs`：仅声明顶层模块（不会因模块增多而爆炸）
+   - `<group>/mod.rs`：声明该目录下的子模块
+   - `<leaf>.rs`：具体 FFI 函数（`#[no_mangle]` + `pub unsafe extern "C"`）
+
 2. 按照 `references/hicc-guide.md` 中的规范编写每个 FFI 函数的 Rust 实现：
    - 使用 `hicc::bridge` 宏（或手动 `extern "C"` 块）包装 C 函数。
    - 所有裸指针操作须包裹在 `unsafe` 块中，并添加安全注释。
