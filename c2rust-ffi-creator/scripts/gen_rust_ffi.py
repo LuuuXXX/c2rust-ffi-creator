@@ -122,6 +122,8 @@ def map_c_type(c_type: str) -> str:
         return rust_base
 
     # 最内层指针：用 const/mut 修饰 base
+    # 注意：仅检查 c_type 中是否含 "const"，无法区分 "const char **"（指向常量的指针的指针）
+    # 与 "char * const *"（常量指针的指针）等精细语义；对绝大多数 FFI 场景已足够。
     innermost = "c_void" if rust_base == "()" else rust_base
     qualifier = "const" if is_const else "mut"
     result = f"*{qualifier} {innermost}"
