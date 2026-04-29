@@ -11,7 +11,6 @@ init_rust_project.sh 的 Python 替代实现
 """
 
 import sys
-import os
 from pathlib import Path
 
 WORKSPACE_CARGO_TOML = """\

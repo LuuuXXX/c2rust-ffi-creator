@@ -13,11 +13,32 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${1:-$(pwd)}"
+OS_TYPE="$(uname -s)"
 
 C_DIR="${PROJECT_ROOT}/.c2rust/c"
 SPEC_JSON="${C_DIR}/spec.json"
 EXPECTED_FILE="${C_DIR}/symbols_expected.txt"
 RUST_TARGET="${PROJECT_ROOT}/target/release"
+
+# 辅助函数：跨平台提取库的已定义公开符号
+_nm_symbols() {
+    local lib="$1"
+    if [[ "${OS_TYPE}" == "Darwin" ]]; then
+        # macOS: -g 全局符号，-U 仅已定义
+        nm -gU "${lib}" 2>/dev/null | awk '{print $NF}'
+    elif [[ "${lib}" == *.so || "${lib}" == *.dylib ]]; then
+        # Linux 动态库：读取 .dynsym 节
+        nm -D --defined-only "${lib}" 2>/dev/null | awk '{print $NF}'
+    else
+        # Linux 静态库
+        nm --defined-only "${lib}" 2>/dev/null | awk '{print $NF}'
+    fi
+}
+
+# 临时文件（通过 trap 在退出时自动清理）
+TMP_RUST_SYMBOLS="$(mktemp)"
+TMP_EXPECTED_SYMBOLS="$(mktemp)"
+trap 'rm -f "${TMP_RUST_SYMBOLS}" "${TMP_EXPECTED_SYMBOLS}"' EXIT
 
 echo "═══════════════════════════════════════════════════"
 echo "  c2rust-ffi-creator 符号表验证"
@@ -49,12 +70,12 @@ if [[ ! -f "${EXPECTED_FILE}" ]]; then
 
     if [[ -n "${C_LIB_SO}" ]]; then
         echo "  使用 C 动态库：${C_LIB_SO}"
-        nm -D --defined-only "${C_LIB_SO}" 2>/dev/null \
-            | awk '{print $NF}' | grep -v '^$' | sort -u > "${EXPECTED_FILE}"
+        _nm_symbols "${C_LIB_SO}" \
+            | grep -v '^$' | sort -u > "${EXPECTED_FILE}"
     elif [[ -n "${C_LIB_A}" ]]; then
         echo "  使用 C 静态库：${C_LIB_A}"
-        nm --defined-only "${C_LIB_A}" 2>/dev/null \
-            | awk '{print $NF}' | grep -v '^$' | sort -u > "${EXPECTED_FILE}"
+        _nm_symbols "${C_LIB_A}" \
+            | grep -v '^$' | sort -u > "${EXPECTED_FILE}"
     else
         echo "✗ 错误：构建完成但未找到 .so / .a 产物，请检查 C 项目的构建输出目录。"
         exit 1
@@ -82,39 +103,37 @@ RUST_LIB_A=$(find "${RUST_TARGET}" -maxdepth 1 -name "libc2rust_ffi.a" 2>/dev/nu
 
 if [[ -n "${RUST_LIB_SO}" ]]; then
     echo "  使用动态库：${RUST_LIB_SO}"
-    nm -D --defined-only "${RUST_LIB_SO}" 2>/dev/null \
-        | awk '{print $NF}' \
+    _nm_symbols "${RUST_LIB_SO}" \
         | grep -v -E '^(__rust_|_rust_|rust_|_ZN(3std|4core|5alloc)|____)' \
         | grep -v '^$' \
-        | sort -u > /tmp/rust_symbols.txt
+        | sort -u > "${TMP_RUST_SYMBOLS}"
 elif [[ -n "${RUST_LIB_A}" ]]; then
     echo "  使用静态库：${RUST_LIB_A}"
-    nm --defined-only "${RUST_LIB_A}" 2>/dev/null \
-        | awk '{print $NF}' \
+    _nm_symbols "${RUST_LIB_A}" \
         | grep -v -E '^(__rust_|_rust_|rust_|_ZN(3std|4core|5alloc)|____)' \
         | grep -v '^$' \
-        | sort -u > /tmp/rust_symbols.txt
+        | sort -u > "${TMP_RUST_SYMBOLS}"
 else
     echo "✗ 错误：在 ${RUST_TARGET} 中未找到 libc2rust_ffi.so 或 libc2rust_ffi.a"
     exit 1
 fi
 
-RUST_COUNT=$(wc -l < /tmp/rust_symbols.txt)
+RUST_COUNT=$(wc -l < "${TMP_RUST_SYMBOLS}")
 echo "  Rust 导出符号数：${RUST_COUNT}"
 
 # ── 步骤 3：读取 C 基准符号 ──────────────────────────
 echo ""
 echo "[3/4] 读取 C 基准符号表..."
 
-grep -v '^#' "${EXPECTED_FILE}" | grep -v '^$' | sort -u > /tmp/expected_symbols.txt
-EXPECTED_COUNT=$(wc -l < /tmp/expected_symbols.txt)
+grep -v '^#' "${EXPECTED_FILE}" | grep -v '^$' | sort -u > "${TMP_EXPECTED_SYMBOLS}"
+EXPECTED_COUNT=$(wc -l < "${TMP_EXPECTED_SYMBOLS}")
 echo "  C 基准符号数：${EXPECTED_COUNT}"
 
 # ── 步骤 4：比对 ─────────────────────────────────────
 echo ""
 echo "[4/4] 对比 C 基准符号 vs Rust 导出符号..."
 
-DIFF_OUTPUT=$(diff /tmp/expected_symbols.txt /tmp/rust_symbols.txt || true)
+DIFF_OUTPUT=$(diff "${TMP_EXPECTED_SYMBOLS}" "${TMP_RUST_SYMBOLS}" || true)
 
 if [[ -z "${DIFF_OUTPUT}" ]]; then
     echo ""

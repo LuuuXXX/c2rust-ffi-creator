@@ -22,9 +22,12 @@ mod sys {
     #[allow(unused_imports)]
     use super::*;
     extern "C" {
-        pub(super) fn temp_sensor_init(addr: u8) -> c_int;
-        pub(super) fn temp_sensor_read(addr: u8, out: *mut TempReadingT) -> c_int;
-        pub(super) fn temp_sensor_shutdown(addr: u8);
+        #[link_name = "temp_sensor_init"]
+        pub(super) fn __c_temp_sensor_init(addr: u8) -> c_int;
+        #[link_name = "temp_sensor_read"]
+        pub(super) fn __c_temp_sensor_read(addr: u8, out: *mut TempReadingT) -> c_int;
+        #[link_name = "temp_sensor_shutdown"]
+        pub(super) fn __c_temp_sensor_shutdown(addr: u8);
     }
 }
 
@@ -33,7 +36,7 @@ mod sys {
 /// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
 #[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn temp_sensor_init(addr: u8) -> c_int {
-    sys::temp_sensor_init(addr)
+    sys::__c_temp_sensor_init(addr)
 }
 
 /// # Safety
@@ -41,7 +44,7 @@ pub unsafe extern "C" fn temp_sensor_init(addr: u8) -> c_int {
 /// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
 #[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn temp_sensor_read(addr: u8, out: *mut TempReadingT) -> c_int {
-    sys::temp_sensor_read(addr, out)
+    sys::__c_temp_sensor_read(addr, out)
 }
 
 /// # Safety
@@ -49,7 +52,7 @@ pub unsafe extern "C" fn temp_sensor_read(addr: u8, out: *mut TempReadingT) -> c
 /// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
 #[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn temp_sensor_shutdown(addr: u8) {
-    sys::temp_sensor_shutdown(addr)
+    sys::__c_temp_sensor_shutdown(addr)
 }
 
 // ── Rust 测试（对应 C 测试文件 tests/test_temperature.c）────────────────────

@@ -11,10 +11,14 @@ mod sys {
     #[allow(unused_imports)]
     use super::*;
     extern "C" {
-        pub(super) fn i2c_open(bus_path: *const c_char) -> c_int;
-        pub(super) fn i2c_close(fd: c_int) -> ();
-        pub(super) fn i2c_write(fd: c_int, addr: u8, data: *const u8, len: usize) -> c_int;
-        pub(super) fn i2c_read(fd: c_int, addr: u8, buf: *mut u8, len: usize) -> c_int;
+        #[link_name = "i2c_open"]
+        pub(super) fn __c_i2c_open(bus_path: *const c_char) -> c_int;
+        #[link_name = "i2c_close"]
+        pub(super) fn __c_i2c_close(fd: c_int) -> ();
+        #[link_name = "i2c_write"]
+        pub(super) fn __c_i2c_write(fd: c_int, addr: u8, data: *const u8, len: usize) -> c_int;
+        #[link_name = "i2c_read"]
+        pub(super) fn __c_i2c_read(fd: c_int, addr: u8, buf: *mut u8, len: usize) -> c_int;
     }
 }
 
@@ -23,7 +27,7 @@ mod sys {
 /// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
 #[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn i2c_open(bus_path: *const c_char) -> c_int {
-    sys::i2c_open(bus_path)
+    sys::__c_i2c_open(bus_path)
 }
 
 /// # Safety
@@ -31,7 +35,7 @@ pub unsafe extern "C" fn i2c_open(bus_path: *const c_char) -> c_int {
 /// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
 #[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn i2c_close(fd: c_int) -> () {
-    sys::i2c_close(fd)
+    sys::__c_i2c_close(fd)
 }
 
 /// # Safety
@@ -39,7 +43,7 @@ pub unsafe extern "C" fn i2c_close(fd: c_int) -> () {
 /// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
 #[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn i2c_write(fd: c_int, addr: u8, data: *const u8, len: usize) -> c_int {
-    sys::i2c_write(fd, addr, data, len)
+    sys::__c_i2c_write(fd, addr, data, len)
 }
 
 /// # Safety
@@ -47,5 +51,5 @@ pub unsafe extern "C" fn i2c_write(fd: c_int, addr: u8, data: *const u8, len: us
 /// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
 #[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn i2c_read(fd: c_int, addr: u8, buf: *mut u8, len: usize) -> c_int {
-    sys::i2c_read(fd, addr, buf, len)
+    sys::__c_i2c_read(fd, addr, buf, len)
 }

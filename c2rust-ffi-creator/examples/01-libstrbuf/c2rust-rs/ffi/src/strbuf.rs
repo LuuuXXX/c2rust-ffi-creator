@@ -22,11 +22,16 @@ mod sys {
     #[allow(unused_imports)]
     use super::*;
     extern "C" {
-        pub(super) fn strbuf_init(buf: *mut StrbufT, initial_cap: usize) -> c_int;
-        pub(super) fn strbuf_append(buf: *mut StrbufT, str: *const c_char) -> c_int;
-        pub(super) fn strbuf_append_len(buf: *mut StrbufT, data: *const c_char, len: usize) -> c_int;
-        pub(super) fn strbuf_reset(buf: *mut StrbufT) -> ();
-        pub(super) fn strbuf_free(buf: *mut StrbufT) -> ();
+        #[link_name = "strbuf_init"]
+        pub(super) fn __c_strbuf_init(buf: *mut StrbufT, initial_cap: usize) -> c_int;
+        #[link_name = "strbuf_append"]
+        pub(super) fn __c_strbuf_append(buf: *mut StrbufT, str: *const c_char) -> c_int;
+        #[link_name = "strbuf_append_len"]
+        pub(super) fn __c_strbuf_append_len(buf: *mut StrbufT, data: *const c_char, len: usize) -> c_int;
+        #[link_name = "strbuf_reset"]
+        pub(super) fn __c_strbuf_reset(buf: *mut StrbufT) -> ();
+        #[link_name = "strbuf_free"]
+        pub(super) fn __c_strbuf_free(buf: *mut StrbufT) -> ();
     }
 }
 
@@ -35,7 +40,7 @@ mod sys {
 /// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
 #[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn strbuf_init(buf: *mut StrbufT, initial_cap: usize) -> c_int {
-    sys::strbuf_init(buf, initial_cap)
+    sys::__c_strbuf_init(buf, initial_cap)
 }
 
 /// # Safety
@@ -43,7 +48,7 @@ pub unsafe extern "C" fn strbuf_init(buf: *mut StrbufT, initial_cap: usize) -> c
 /// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
 #[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn strbuf_append(buf: *mut StrbufT, str: *const c_char) -> c_int {
-    sys::strbuf_append(buf, str)
+    sys::__c_strbuf_append(buf, str)
 }
 
 /// # Safety
@@ -55,7 +60,7 @@ pub unsafe extern "C" fn strbuf_append_len(
     data: *const c_char,
     len: usize,
 ) -> c_int {
-    sys::strbuf_append_len(buf, data, len)
+    sys::__c_strbuf_append_len(buf, data, len)
 }
 
 /// # Safety
@@ -63,7 +68,7 @@ pub unsafe extern "C" fn strbuf_append_len(
 /// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
 #[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn strbuf_reset(buf: *mut StrbufT) {
-    sys::strbuf_reset(buf)
+    sys::__c_strbuf_reset(buf)
 }
 
 /// # Safety
@@ -71,7 +76,7 @@ pub unsafe extern "C" fn strbuf_reset(buf: *mut StrbufT) {
 /// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
 #[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn strbuf_free(buf: *mut StrbufT) {
-    sys::strbuf_free(buf)
+    sys::__c_strbuf_free(buf)
 }
 
 // ── Rust 测试（对应 C 测试文件 tests/test_strbuf.c）─────────────────────────

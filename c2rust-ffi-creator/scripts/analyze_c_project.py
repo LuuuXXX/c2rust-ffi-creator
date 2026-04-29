@@ -122,14 +122,20 @@ def extract_structs_enums(header: Path):
     return contracts
 
 
-def find_south_deps(src_files, all_module_names):
-    """通过 #include 分析南向依赖。"""
+def find_south_deps(src_files, all_module_names, mod_name=None):
+    """通过 #include 分析南向依赖。
+
+    mod_name：当前模块名，用于跳过自包含（如 temperature.c 包含 sensor/temperature.h）。
+    """
     deps = set()
     ext_libs = set()
     for src in src_files:
         text = src.read_text(errors="replace")
         for inc in re.findall(r'#include\s+[<"]([^>"]+)[>"]', text):
             stem = Path(inc).stem
+            # 跳过自包含头文件，避免将父目录误判为外部依赖
+            if mod_name and stem == mod_name:
+                continue
             if stem in all_module_names:
                 deps.add(stem)
             elif "/" in inc:
@@ -240,7 +246,7 @@ def analyze(c_dir: str):
 
         north_ifaces = extract_functions_from_header(header)
         data_contracts = extract_structs_enums(header)
-        south_deps = find_south_deps(mod_sources, all_module_names - {mod_name})
+        south_deps = find_south_deps(mod_sources, all_module_names - {mod_name}, mod_name)
         test_cov = find_test_coverage_in_files(test_files, mod_name)
 
         spec["modules"].append({

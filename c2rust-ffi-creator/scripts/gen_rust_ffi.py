@@ -161,7 +161,7 @@ def gen_module_rs(mod_name: str, interfaces: list, timestamp: str, original_head
         "",
         "#![allow(non_camel_case_types, non_snake_case, dead_code, unused_imports)]",
         "",
-        "use std::ffi::{c_int, c_uint, c_long, c_char, c_void, c_float, c_double};",
+        "use std::ffi::{c_int, c_uint, c_long, c_ulong, c_short, c_char, c_void, c_float, c_double};",
         "",
     ]
 
@@ -184,7 +184,9 @@ def gen_module_rs(mod_name: str, interfaces: list, timestamp: str, original_head
             "",
         ]
 
-    # extern "C" 块（包裹在 mod sys 中，避免与公开封装函数同名冲突）
+    # extern "C" 块（包裹在 mod sys 中）
+    # 每个绑定用 #[link_name] 显式指定 C 符号名，Rust 侧使用 __c_ 前缀，
+    # 避免 release 构建中公开 wrapper（同名 #[no_mangle]）与 extern 引用形成循环。
     lines += [
         "mod sys {",
         "    #[allow(unused_imports)]",
@@ -194,10 +196,12 @@ def gen_module_rs(mod_name: str, interfaces: list, timestamp: str, original_head
     for iface in interfaces:
         params_str = _build_rust_params(iface.get("params", []))
         ret = map_c_type(iface.get("return_type", "int"))
-        lines.append(f"        pub(super) fn {iface['function']}({params_str}) -> {ret};")
+        func = iface["function"]
+        lines.append(f"        #[link_name = \"{func}\"]")
+        lines.append(f"        pub(super) fn __c_{func}({params_str}) -> {ret};")
     lines += ["    }", "}", ""]
 
-    # 公开封装函数（#[no_mangle] + pub extern "C"），通过 sys:: 调用原始 C 函数
+    # 公开封装函数（#[no_mangle] + pub extern "C"），通过 sys::__c_ 调用原始 C 函数
     for iface in interfaces:
         func = iface["function"]
         params_str = _build_rust_params(iface.get("params", []))
@@ -213,7 +217,7 @@ def gen_module_rs(mod_name: str, interfaces: list, timestamp: str, original_head
             "/// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。",
             "#[cfg_attr(not(test), no_mangle)]",
             f"pub unsafe extern \"C\" fn {func}({params_str}) -> {ret} {{",
-            f"    sys::{func}({params_call})",
+            f"    sys::__c_{func}({params_call})",
             "}",
             "",
         ]
