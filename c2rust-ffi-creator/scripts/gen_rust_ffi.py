@@ -66,7 +66,7 @@ def header_to_module_path(header: str) -> list:
     }
     normalized = []
     for part in parts:
-        if part and part[0].isdigit():
+        if part[0].isdigit():
             part = "_" + part
         if part in _RUST_KEYWORDS:
             part = part + "_"

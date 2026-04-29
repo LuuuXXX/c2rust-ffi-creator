@@ -160,9 +160,9 @@ def find_test_coverage_in_files(test_files: list, module_name: str):
 
 def detect_build_system(c_dir: Path):
     if (c_dir / "CMakeLists.txt").exists():
-        return "cmake", ["cmake", "-B", "build", "&&", "cmake", "--build", "build"], ["ctest", "--test-dir", "build"]
+        return "cmake", "cmake -B build && cmake --build build", "ctest --test-dir build"
     if (c_dir / "configure.ac").exists() or (c_dir / "configure").exists():
-        return "autoconf", ["./configure", "&&", "make"], ["make", "check"]
+        return "autoconf", "./configure && make", "make check"
     if (c_dir / "Makefile").exists():
         return "make", ["make"], ["make", "test"]
     return "unknown", ["make"], ["make", "test"]
