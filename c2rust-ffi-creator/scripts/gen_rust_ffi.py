@@ -101,9 +101,12 @@ C_TO_RUST = {
 
 
 def map_c_type(c_type: str) -> str:
-    """将 C 类型字符串转换为 Rust 类型字符串（尽力而为）。"""
+    """将 C 类型字符串转换为 Rust 类型字符串（尽力而为）。
+
+    支持多级指针（如 ``char **``），逐级生成 ``*mut``/``*const`` 链。
+    """
     c_type = c_type.strip()
-    is_ptr = "*" in c_type
+    ptr_depth = c_type.count("*")
     is_const = "const" in c_type
 
     base = c_type.replace("const", "").replace("*", "").strip()
@@ -115,12 +118,17 @@ def map_c_type(c_type: str) -> str:
         # 未知类型：生成占位名（PascalCase）
         rust_base = "".join(w.capitalize() for w in re.split(r'[\s_]+', base))
 
-    if is_ptr:
-        if is_const:
-            return f"*const {rust_base}" if rust_base != "()" else "*const c_void"
-        else:
-            return f"*mut {rust_base}" if rust_base != "()" else "*mut c_void"
-    return rust_base
+    if ptr_depth == 0:
+        return rust_base
+
+    # 最内层指针：用 const/mut 修饰 base
+    innermost = "c_void" if rust_base == "()" else rust_base
+    qualifier = "const" if is_const else "mut"
+    result = f"*{qualifier} {innermost}"
+    # 外层指针（多级时均为 *mut）
+    for _ in range(ptr_depth - 1):
+        result = f"*mut {result}"
+    return result
 
 
 def _is_placeholder_type(c_type: str) -> tuple:
@@ -254,8 +262,12 @@ def write_mod_rs_files(src_dir: Path, module_tree: dict, timestamp: str):
             f"{mod_decls}\n"
         )
         mod_rs_path = dir_path / "mod.rs"
-        mod_rs_path.write_text(mod_rs_content)
-        print(f"✓ 已生成 {mod_rs_path.relative_to(src_dir.parent.parent)}")
+        mod_rs_path.write_text(mod_rs_content, encoding="utf-8")
+        try:
+            display = mod_rs_path.relative_to(src_dir.parent.parent)
+        except ValueError:
+            display = mod_rs_path
+        print(f"✓ 已生成 {display}")
 
 
 def update_lib_rs(src_dir: Path, module_tree: dict, timestamp: str):
@@ -275,7 +287,7 @@ def update_lib_rs(src_dir: Path, module_tree: dict, timestamp: str):
         f"\n"
         f"{mod_decls}\n"
     )
-    lib_path.write_text(content)
+    lib_path.write_text(content, encoding="utf-8")
     print(f"✓ 已更新 lib.rs")
 
 
@@ -289,7 +301,7 @@ def parse_spec_json(spec_path: Path) -> list:
 
     返回每个模块的 dict，包含 name、header、north_interfaces 字段。
     """
-    data = json.loads(spec_path.read_text())
+    data = json.loads(spec_path.read_text(encoding="utf-8"))
     modules = []
     for mod in data.get("modules", []):
         modules.append({
@@ -302,7 +314,7 @@ def parse_spec_json(spec_path: Path) -> list:
 
 def parse_interfaces_md(md_path: Path) -> list:
     """从 interfaces.md 提取模块和接口信息（兼容模式，不含路径信息）。"""
-    text = md_path.read_text()
+    text = md_path.read_text(encoding="utf-8")
     modules = []
     current_mod = None
 
@@ -422,7 +434,7 @@ def gen_ffi(input_path: str, output_src_dir: str):
         out_file.parent.mkdir(parents=True, exist_ok=True)
 
         content = gen_module_rs(mod_name, mod["north_interfaces"], timestamp, mod.get("header", ""))
-        out_file.write_text(content)
+        out_file.write_text(content, encoding="utf-8")
         rust_path = "::".join(parts)
         try:
             display = out_file.relative_to(src_dir.parent.parent)

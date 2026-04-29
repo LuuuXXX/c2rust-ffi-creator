@@ -14,7 +14,7 @@
     "name": "string",            // 项目名称
     "version": "string",         // 版本号（从 Makefile 或 configure.ac 提取）
     "build_system": "make|cmake|autoconf",
-    "build_command": "string",   // 完整构建命令，例如 "make all"
+    "build_command": ["make", "all"],  // 构建命令，JSON 数组（argv 形式），例如 ["make", "all"] 或 ["cmake", "--build", "."]
     "test_command": "string",    // 完整测试命令，例如 "make test"
     "output_artifacts": [        // 构建产物路径列表（相对于 .c2rust/c/，由 verify_symbols.sh 读取）
       "libfoo.a",               // 例如静态库

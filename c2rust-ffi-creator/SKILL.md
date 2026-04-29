@@ -76,19 +76,20 @@ description: 此技能应在用户需要将 C 项目迁移为 Rust FFI 封装层
    ├── lib.rs            # pub mod crypto; pub mod net;
    ├── crypto/
    │   ├── mod.rs        # pub mod aes;
-   │   └── aes.rs        # extern "C" + pub unsafe extern "C" fn aes_*
+   │   └── aes.rs        # extern "C" 声明 + pub unsafe extern "C" fn aes_*
    └── net/
        ├── mod.rs        # pub mod tcp;
-       └── tcp.rs        # extern "C" + pub unsafe extern "C" fn tcp_*
+       └── tcp.rs        # extern "C" 声明 + pub unsafe extern "C" fn tcp_*
    ```
 
    - `lib.rs`：仅声明顶层模块（不会因模块增多而爆炸）
    - `<group>/mod.rs`：声明该目录下的子模块
-   - `<leaf>.rs`：具体 FFI 函数（`#[cfg_attr(not(test), no_mangle)]` + `pub unsafe extern "C"`）
+   - `<leaf>.rs`：`mod sys { extern "C" { ... } }` 绑定 C 符号，以及公开封装函数（不添加 `#[no_mangle]`）
 
-   > **链接模型说明**：`#[no_mangle]` 仅在非测试构建中生效，以避免 `cargo test` 时链接器将
-   > `extern "C"` 引用解析到 Rust 包装函数本身（而非 C 实现）导致的递归。测试构建中
-   > 包装函数以普通 Rust 名称存在，`extern "C"` 块引用顺利解析到 C 静态库。
+   > **链接模型说明**：对外可见的 C 符号由 `build.rs` 通过 `hicc-build` 编译并链接进来的
+   > C 对象/静态库直接提供，Rust 侧包装函数**不**使用 `#[no_mangle]`，因此不会重复导出符号。
+   > 无论普通构建还是 `cargo test`，均通过 `ffi/build.rs` 将 C 源文件编译为静态库后链接，
+   > 使 `extern "C"` 引用正确解析到 C 实现，避免符号重复定义或循环引用。
 
 2. **人工审核生成的 Rust 文件**，重点检查：
    - 将自动生成的不透明占位结构体（`pub struct FooT { _opaque: [u8; 0] }`）替换为与 C 端

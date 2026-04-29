@@ -131,7 +131,7 @@ def create_project(output_dir: str):
         root / "ffi" / "tests" / "lib.rs": FFI_TEST_RS,
     }
     for path, content in files.items():
-        path.write_text(content)
+        path.write_text(content, encoding="utf-8")
         print(f"  创建文件：{path.relative_to(root)}")
 
     # 创建 .c2rust/c/README.md 说明
@@ -144,7 +144,8 @@ def create_project(output_dir: str):
         "## 分析产物（由工具自动生成）\n\n"
         "- `spec.json`：由 analyze_c_project.py 生成的项目规格\n"
         "- `interfaces.md`：人工可读的接口清单\n"
-        "- `symbols_expected.txt`：从原 C 构建产物提取的预期导出符号表\n"
+        "- `symbols_expected.txt`：从原 C 构建产物提取的预期导出符号表\n",
+        encoding="utf-8",
     )
     print(f"  创建文件：.c2rust/c/README.md")
 

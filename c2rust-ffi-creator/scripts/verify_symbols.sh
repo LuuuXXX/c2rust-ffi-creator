@@ -55,16 +55,24 @@ if [[ ! -f "${EXPECTED_FILE}" ]]; then
         exit 1
     fi
 
-    # 从 spec.json 读取构建命令（将路径作为参数传给 Python，避免路径中特殊字符注入）
-    C_BUILD_CMD=$(python3 -c "import json, sys; d = json.load(open(sys.argv[1])); print(d['project']['build_command'])" "${SPEC_JSON}")
-    echo "  C 构建命令：${C_BUILD_CMD}"
+    # 在 C 目录内执行构建（build_command 须为 JSON 数组，由 Python 直接调用以避免 shell 注入）
+    python3 - "${SPEC_JSON}" "${C_DIR}" <<'PYEOF'
+import json, sys, subprocess, os
 
-    # 在 C 目录内执行构建（保留原目录结构，构建可正常工作）
-    # ⚠️  安全提示：build_command 取自 spec.json；请确保该文件来自受信任的仓库。
-    #    如有需要可用 JSON 数组格式存储构建命令并用 "${CMD[@]}" 调用，以避免 shell 注入风险。
-    pushd "${C_DIR}" > /dev/null
-    eval "${C_BUILD_CMD}"
-    popd > /dev/null
+spec_json = sys.argv[1]
+c_dir     = sys.argv[2]
+with open(spec_json, encoding="utf-8") as f:
+    d = json.load(f)
+cmd = d["project"]["build_command"]
+if isinstance(cmd, str):
+    # 兼容旧字符串格式，按空格分割（不含特殊 shell 字符时安全）
+    import shlex
+    cmd = shlex.split(cmd)
+print(f"  C 构建命令：{cmd}")
+os.chdir(c_dir)
+result = subprocess.run(cmd)
+sys.exit(result.returncode)
+PYEOF
 
     # 优先从 spec.json output_artifacts 字段获取预期产物路径（将路径作为参数传给 Python）
     ARTIFACTS_JSON=$(python3 -c "
@@ -193,15 +201,15 @@ else
     echo "────────────────────────────────────────"
     echo ""
     echo "修复建议："
-    echo "  对于 '< symbol_name'（C 有但 Rust 缺失）："
-    echo "    1. 检查对应 Rust 函数是否添加了 #[no_mangle]"
-    echo "    2. 检查函数是否声明为 pub extern \"C\""
-    echo "    3. 检查函数名拼写是否与 C 头文件一致"
+    echo "  对于 '< symbol_name'（C 有但 Rust 产物中缺失）："
+    echo "    1. 检查 ffi/build.rs 是否已将对应 C 源文件（或静态库）编译并链接进来"
+    echo "    2. 检查 spec.json output_artifacts 字段是否指向正确的构建产物路径"
+    echo "    3. 确认 C 源文件中的函数已在头文件中声明，并被 hicc-build 正确编译"
     echo ""
-    echo "  对于 '> symbol_name'（Rust 多出的符号）："
+    echo "  对于 '> symbol_name'（Rust 产物多出的符号）："
     echo "    1. 若是预期新增的导出，先更新 C 项目后重新提取基准："
     echo "       rm ${EXPECTED_FILE} && bash scripts/verify_symbols.sh ${PROJECT_ROOT}"
-    echo "    2. 若是意外导出，检查相应函数的可见性修饰符"
+    echo "    2. 若是意外导出，检查 ffi/build.rs 是否链接了非预期的 C 目标文件"
     echo "════════════════════════════════════════"
     exit 1
 fi
