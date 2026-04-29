@@ -69,13 +69,19 @@ diff c_symbols.txt rust_symbols_filtered.txt
 
 ---
 
-## symbols_expected.txt 格式
+## symbols_expected.txt 格式与生成方式
 
-最终验证通过后，将预期符号表写入 `.c2rust/c/symbols_expected.txt`：
+`symbols_expected.txt` 必须从**原 C 项目的构建产物**中提取，而非从 Rust 产物中提取。`verify_symbols.sh` 会在首次运行时自动完成此步骤：
+
+1. 读取 `spec.json` 中的 `build_command`
+2. 在 `.c2rust/c/` 目录内执行构建（原目录结构保证构建可复现）
+3. 找到 C 产物（`.so` / `.a`），用 `nm` 提取符号并写入 `symbols_expected.txt`
+
+**文件格式**（每行一个符号名）：
 
 ```
 # 格式：每行一个符号名（不含地址和类型）
-# 生成时间：<timestamp>
+# 从 C 产物提取时间：<timestamp>
 # C 源产物：<path>
 
 foo_init
@@ -87,11 +93,7 @@ bar_read
 bar_write
 ```
 
-CI 中可用此文件进行回归验证：
-
-```bash
-diff .c2rust/c/symbols_expected.txt <(nm -D --defined-only target/release/libc2rust_ffi.so | awk '{print $3}' | sort)
-```
+将此文件提交到版本控制。后续每次修改 Rust FFI 后，`verify_symbols.sh` 会将 Rust 产物的符号与此基准对比。
 
 ---
 

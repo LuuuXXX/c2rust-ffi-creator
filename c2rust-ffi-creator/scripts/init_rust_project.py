@@ -101,9 +101,7 @@ def create_project(output_dir: str):
 
     dirs = [
         root,
-        root / ".c2rust" / "c" / "src",
-        root / ".c2rust" / "c" / "include",
-        root / ".c2rust" / "c" / "tests",
+        root / ".c2rust" / "c",   # 仅创建空目录；原 C 项目将以 cp -r 保留结构复制进来
         root / "ffi" / "src",
         root / "tests",
     ]
@@ -127,20 +125,22 @@ def create_project(output_dir: str):
     readme = root / ".c2rust" / "c" / "README.md"
     readme.write_text(
         "# 原始 C 项目代码\n\n"
-        "- `src/`：核心 C 源码\n"
-        "- `include/`：公开头文件\n"
-        "- `tests/`：原始 C 测试代码\n"
+        "此目录通过 `cp -r <原C项目根目录>/. .c2rust/c/` 完整复制，保留原始目录结构。\n\n"
+        "**禁止**手动重组此目录结构，否则将破坏 `#include` 相对路径，\n"
+        "导致无法在此目录内复现原 C 项目的构建与测试。\n\n"
+        "## 分析产物（由工具自动生成）\n\n"
         "- `spec.json`：由 analyze_c_project.py 生成的项目规格\n"
         "- `interfaces.md`：人工可读的接口清单\n"
-        "- `symbols_expected.txt`：预期导出符号表\n"
+        "- `symbols_expected.txt`：从原 C 构建产物提取的预期导出符号表\n"
     )
     print(f"  创建文件：.c2rust/c/README.md")
 
     print(f"\n✓ 项目初始化完成：{root}")
     print("\n后续步骤：")
-    print("  1. 将原 C 项目代码复制到 .c2rust/c/")
-    print("  2. 运行 analyze_c_project.py 生成 spec.json")
-    print("  3. 运行 gen_rust_ffi.py 生成 Rust FFI 骨架")
+    print("  1. cp -r <原C项目根目录>/. .c2rust/c/  （保留完整目录结构）")
+    print("  2. 在 .c2rust/c 内验证原 C 项目可以正常构建")
+    print("  3. 运行 analyze_c_project.py 生成 spec.json")
+    print("  4. 运行 gen_rust_ffi.py 生成 Rust FFI 骨架")
 
 def main():
     if len(sys.argv) != 2:

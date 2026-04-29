@@ -23,28 +23,30 @@ description: 此技能应在用户需要将 C 项目迁移为 Rust FFI 封装层
    c2rust-rs/
    ├── Cargo.toml          # 工作空间 manifest
    ├── .c2rust/
-   │   └── c/              # 存放原 C 项目代码和分析产物
+   │   └── c/              # 存放原 C 项目完整目录树及分析产物
    ├── ffi/                # Rust FFI 封装 crate
    │   ├── Cargo.toml
    │   └── src/
    │       └── lib.rs
    └── tests/              # 集成测试
-       └── ffi_tests.rs
+       └── lib.rs
    ```
 3. 在 `Cargo.toml` 中加入 `hicc` 依赖（见 `references/hicc-guide.md` §配置）。
 
 ---
 
-### 阶段二：分析 C 项目，复制核心代码
+### 阶段二：复制 C 项目，保留原目录结构
 
-1. 将原 C 项目的**核心源码**（`.c` / `.h`）复制到 `c2rust-rs/.c2rust/c/src/`。
-2. 将原 C 项目的**测试代码**（`test_*.c` / `*_test.c`）复制到 `c2rust-rs/.c2rust/c/tests/`。
-3. 运行 `scripts/analyze_c_project.py c2rust-rs/.c2rust/c` 自动提取：
+1. 使用 `cp -r <原C项目根目录>/. c2rust-rs/.c2rust/c/` **完整复制**原 C 项目到 `.c2rust/c/`，保留全部子目录层级。
+   - **禁止**将文件打平到 `src/` 或 `tests/` 等固定目录——这会破坏 `#include` 相对路径，导致无法在 `.c2rust/c` 内重新构建。
+   - 如使用 Git 子模块或符号链接，也应保持原始路径关系。
+   - 复制后验证：在 `c2rust-rs/.c2rust/c` 内能复现原 C 项目的构建命令（例如 `make`、`cmake -B build`），若复现失败则说明路径关系已损坏，需检查复制方式。
+2. 运行 `scripts/analyze_c_project.py c2rust-rs/.c2rust/c` 自动提取：
    - 目录结构与模块划分
    - 公开头文件（北向接口）
    - 内部模块间调用（南向依赖）
    - Makefile / CMakeLists 中的构建目标与测试命令
-4. 分析结果写入 `c2rust-rs/.c2rust/c/spec.json`（结构见 `references/c-project-spec.md`）。
+3. 分析结果写入 `c2rust-rs/.c2rust/c/spec.json`（结构见 `references/c-project-spec.md`）。
 
 ---
 
@@ -77,7 +79,8 @@ description: 此技能应在用户需要将 C 项目迁移为 Rust FFI 封装层
 
 ### 阶段五：转换 C 测试为 Rust 测试
 
-1. 对照 `c2rust-rs/.c2rust/c/tests/` 中的每个 C 测试文件，在 `c2rust-rs/tests/` 下生成对应的 Rust 测试文件。
+1. 根据 `spec.json` 中 `test_files` 字段定位原 C 测试文件（路径相对于 `.c2rust/c/`）。
+2. 对照每个 C 测试文件，在 `c2rust-rs/tests/` 下生成对应的 Rust 测试文件，文件名与原 C 测试文件保持一致（将 `.c` 替换为 `.rs`）。
 2. 遵循转换规则（详见 `references/test-conversion.md`）：
    - `assert(expr)` → `assert!(expr)`
    - `assert_eq(a, b)` → `assert_eq!(a, b)`
@@ -107,6 +110,7 @@ description: 此技能应在用户需要将 C 项目迁移为 Rust FFI 封装层
 
 为减少大模型推断，执行过程中须遵守以下约束：
 
+- **禁止打平 C 项目目录结构**：原 C 项目必须以 `cp -r` 方式完整复制，保留所有子目录层级，不得重组为 `src/`/`include/`/`tests/` 等固定结构。
 - **禁止推断未经验证的 C 函数签名**：所有函数签名须从头文件直接提取，不得凭经验填写。
 - **禁止跳过符号验证步骤**：阶段六必须执行，符号差异必须修复后方可视为完成。
 - **禁止删除 `unsafe` 块**：凡涉及裸指针或 FFI 调用，一律保留 `unsafe` 并添加安全注释。

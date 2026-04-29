@@ -139,16 +139,13 @@ def find_south_deps(src_files, all_module_names):
     return result
 
 
-def find_test_coverage(tests_dir: Path, module_name: str):
-    """从测试文件中找出覆盖某模块的测试函数。"""
-    if not tests_dir.exists():
-        return []
+def find_test_coverage_in_files(test_files: list, module_name: str):
+    """从已识别的测试文件列表中找出覆盖某模块的测试函数。"""
     covered = []
-    for tf in find_files(tests_dir, [".c"]):
+    for tf in test_files:
         text = tf.read_text(errors="replace")
         if module_name not in text and module_name.replace("_", "") not in text:
             continue
-        # 提取 void test_xxx 函数名
         for m in re.finditer(r'void\s+(test_\w+)\s*\(', text):
             covered.append(m.group(1))
     return list(dict.fromkeys(covered))  # 去重保序
@@ -168,19 +165,47 @@ def detect_build_system(c_dir: Path):
 # 主逻辑
 # ──────────────────────────────────────────────
 
+# 测试文件识别规则：文件名模式或所在目录名
+_TEST_FILE_RE = re.compile(
+    r'(^test_|_test\.c$|_tests\.c$|^check_|_check\.c$|^spec_|_spec\.c$)',
+    re.IGNORECASE,
+)
+_TEST_DIR_NAMES = {"test", "tests", "check", "checks", "spec", "specs", "unittest", "unittests"}
+
+# 分析产物文件名（不应被当作 C 源码扫描）
+_SKIP_FILENAMES = {"spec.json", "interfaces.md", "symbols_expected.txt", "README.md"}
+
+
+def _is_test_file(path: Path) -> bool:
+    """根据文件名或父目录名判断是否为测试文件。"""
+    if _TEST_FILE_RE.search(path.name):
+        return True
+    return any(part.lower() in _TEST_DIR_NAMES for part in path.parts)
+
+
 def analyze(c_dir: str):
     base = Path(c_dir).resolve()
-    src_base = base / "src"
-    inc_base = base / "include"
-    tests_dir = base / "tests"
 
     if not base.exists():
         print(f"错误：目录不存在：{base}")
         sys.exit(1)
 
-    # 收集头文件（优先 include/，其次 src/ 内的 .h）
-    headers = find_files(inc_base, [".h"]) + find_files(src_base, [".h"])
-    sources = find_files(src_base, [".c"])
+    # 全树搜索——保留原目录结构，不做路径假设
+    all_h_files  = find_files(base, [".h"])
+    all_c_files  = find_files(base, [".c"])
+
+    # 过滤掉分析产物目录（如 build/、CMakeFiles/ 等）
+    _skip_dirs = {"build", ".git", "CMakeFiles", "__pycache__", ".c2rust"}
+
+    def not_in_skip_dir(p: Path) -> bool:
+        return not any(part in _skip_dirs for part in p.relative_to(base).parts)
+
+    all_h_files = [p for p in all_h_files if not_in_skip_dir(p)]
+    all_c_files = [p for p in all_c_files if not_in_skip_dir(p)]
+
+    test_files  = [p for p in all_c_files if _is_test_file(p)]
+    sources     = [p for p in all_c_files if not _is_test_file(p)]
+    headers     = all_h_files
 
     if not headers and not sources:
         print(f"警告：在 {base} 中未找到 .h 或 .c 文件。")
@@ -197,7 +222,9 @@ def analyze(c_dir: str):
             "build_system": build_system,
             "build_command": build_cmd,
             "test_command": test_cmd,
-            "output_artifacts": []
+            "output_artifacts": [],
+            # 记录原 C 项目的测试文件路径（供阶段五定位测试文件）
+            "test_files": [str(f.relative_to(base)) for f in test_files],
         },
         "modules": []
     }
@@ -206,13 +233,13 @@ def analyze(c_dir: str):
     for header in headers:
         mod_name = header.stem
 
-        # 找到对应的源文件
-        mod_sources = [s for s in sources if s.stem == mod_name or s.stem.startswith(mod_name)]
+        # 找到对应的源文件（与头文件同名，或同名前缀，位于任意子目录）
+        mod_sources = [s for s in sources if s.stem == mod_name or s.stem.startswith(mod_name + "_")]
 
         north_ifaces = extract_functions_from_header(header)
         data_contracts = extract_structs_enums(header)
         south_deps = find_south_deps(mod_sources, all_module_names - {mod_name})
-        test_cov = find_test_coverage(tests_dir, mod_name)
+        test_cov = find_test_coverage_in_files(test_files, mod_name)
 
         spec["modules"].append({
             "name": mod_name,
