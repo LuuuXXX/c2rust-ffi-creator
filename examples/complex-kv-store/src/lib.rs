@@ -1,9 +1,13 @@
-// src/lib.rs — Safe Rust wrapper for the C kv_store library.
+// src/lib.rs — Safe Rust wrapper for the C kv_store library via hicc.
 //
-// Pattern: C library compiled in via build.rs (cc crate) + safe Rust API.
+// Pattern: C library compiled in via hicc (C++ adapter layer).
 //
-// build.rs compiles `.c2rust/c/src/kv.c` into a static archive and generates
-// Rust type bindings from `.c2rust/c/include/kv.h` using bindgen.
+// build.rs uses:
+//   - cc::Build to compile kv.c with the C compiler
+//   - hicc_build::Build to compile the C++ adapter extracted from src/ffi.rs
+//
+// hicc::import_lib! in src/ffi.rs declares safe Rust functions that call
+// through the C++ adapter into the original C implementation.
 //
 // # Quick example
 //
@@ -15,18 +19,11 @@
 // assert_eq!(store.get("lang").as_deref(), Some("Rust"));
 // store.delete("lang").unwrap();
 // assert_eq!(store.count(), 0);
-// // store is automatically freed here (Drop impl calls kv_destroy)
+// // store is automatically freed here (Drop impl calls kv_destroy_adapter)
 // ```
 
 pub mod error;
-
-mod sys {
-    #![allow(non_upper_case_globals)]
-    #![allow(non_camel_case_types)]
-    #![allow(non_snake_case)]
-    #![allow(dead_code)]
-    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-}
+mod ffi;
 
 use error::KvError;
 use std::ffi::{CStr, CString};
@@ -35,12 +32,12 @@ use std::ffi::{CStr, CString};
 // Helper: convert a raw C status code to Result<(), KvError>
 // ---------------------------------------------------------------------------
 
-fn check_status(code: sys::kv_status_t) -> Result<(), KvError> {
+fn check_status(code: i32) -> Result<(), KvError> {
     match code {
-        sys::kv_status_KV_OK            => Ok(()),
-        sys::kv_status_KV_ERR_NOT_FOUND => Err(KvError::NotFound),
-        sys::kv_status_KV_ERR_NO_MEMORY => Err(KvError::NoMemory),
-        sys::kv_status_KV_ERR_INVALID   => Err(KvError::InvalidArgument),
+        c if c == ffi::KV_OK            => Ok(()),
+        c if c == ffi::KV_ERR_NOT_FOUND => Err(KvError::NotFound),
+        c if c == ffi::KV_ERR_NO_MEMORY => Err(KvError::NoMemory),
+        c if c == ffi::KV_ERR_INVALID   => Err(KvError::InvalidArgument),
         other                           => Err(KvError::Unknown(other)),
     }
 }
@@ -53,7 +50,7 @@ fn check_status(code: sys::kv_status_t) -> Result<(), KvError> {
 ///
 /// The underlying C store is automatically freed when this value is dropped.
 pub struct KvStore {
-    ptr: *mut sys::kv_store_t,
+    ptr: *mut std::os::raw::c_void,
 }
 
 impl KvStore {
@@ -63,7 +60,7 @@ impl KvStore {
     ///
     /// Returns `None` if the C library fails to allocate memory.
     pub fn new(initial_capacity: usize) -> Option<Self> {
-        let ptr = unsafe { sys::kv_new(initial_capacity) };
+        let ptr = ffi::kv_new_adapter(initial_capacity);
         if ptr.is_null() {
             None
         } else {
@@ -82,7 +79,7 @@ impl KvStore {
     pub fn set(&mut self, key: &str, value: &str) -> Result<(), KvError> {
         let c_key   = CString::new(key).map_err(|_| KvError::InvalidArgument)?;
         let c_value = CString::new(value).map_err(|_| KvError::InvalidArgument)?;
-        let status = unsafe { sys::kv_set(self.ptr, c_key.as_ptr(), c_value.as_ptr()) };
+        let status = ffi::kv_set_adapter(self.ptr, c_key.as_ptr(), c_value.as_ptr());
         check_status(status)
     }
 
@@ -93,7 +90,7 @@ impl KvStore {
     /// invalidated by a subsequent `set` or `delete`.)
     pub fn get(&self, key: &str) -> Option<String> {
         let c_key = CString::new(key).ok()?;
-        let ptr = unsafe { sys::kv_get(self.ptr, c_key.as_ptr()) };
+        let ptr = ffi::kv_get_adapter(self.ptr, c_key.as_ptr());
         if ptr.is_null() {
             None
         } else {
@@ -109,22 +106,23 @@ impl KvStore {
     /// Returns `KvError::NotFound` if the key does not exist.
     pub fn delete(&mut self, key: &str) -> Result<(), KvError> {
         let c_key = CString::new(key).map_err(|_| KvError::InvalidArgument)?;
-        let status = unsafe { sys::kv_delete(self.ptr, c_key.as_ptr()) };
+        let status = ffi::kv_delete_adapter(self.ptr, c_key.as_ptr());
         check_status(status)
     }
 
     /// Return the number of entries currently in the store.
     pub fn count(&self) -> usize {
-        unsafe { sys::kv_count(self.ptr) }
+        ffi::kv_count_adapter(self.ptr)
     }
 }
 
 impl Drop for KvStore {
     fn drop(&mut self) {
-        // Safety: ptr was allocated by kv_new and is not aliased anywhere.
-        unsafe { sys::kv_destroy(self.ptr) };
+        // Safety: ptr was allocated by kv_new_adapter and is not aliased anywhere.
+        ffi::kv_destroy_adapter(self.ptr);
     }
 }
 
 // KvStore owns the C pointer and is the sole writer; do not derive Send/Sync
 // without adding locking, since kv.c is not thread-safe.
+

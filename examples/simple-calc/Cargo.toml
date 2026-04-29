@@ -5,4 +5,11 @@ edition = "2021"
 
 [lib]
 name = "simple_calc"
-crate-type = ["cdylib", "staticlib", "rlib"]
+crate-type = ["rlib"]
+
+[dependencies]
+hicc = "0.2"
+
+[build-dependencies]
+hicc-build = "0.2"
+cc = "1.0"

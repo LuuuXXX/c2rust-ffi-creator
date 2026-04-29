@@ -21,7 +21,7 @@ jobs:
       - name: Install C build tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y cmake gcc g++ libclang-dev binutils
+          sudo apt-get install -y cmake gcc g++ binutils
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -41,7 +41,7 @@ jobs:
 
       # ════════════════════════════════════════════════════════════════════
       # Example 1: simple-calc
-      #   Pattern — pure Rust ABI replacement; no C compiled into Rust.
+      #   Pattern — C library compiled in via cc, wrapped by hicc C++ adapter.
       # ════════════════════════════════════════════════════════════════════
 
       - name: "[simple-calc] Build C library and test binary"
@@ -56,37 +56,17 @@ jobs:
         working-directory: examples/simple-calc
         run: .c2rust/c/_build/test_calc
 
-      - name: "[simple-calc] Build Rust"
+      - name: "[simple-calc] Build Rust (using hicc)"
         working-directory: examples/simple-calc
         run: cargo build --release
 
-      - name: "[simple-calc] Test Rust (mirrors C test suite)"
+      - name: "[simple-calc] Test Rust (mirrors C test suite, via hicc)"
         working-directory: examples/simple-calc
         run: cargo test
 
-      - name: "[simple-calc] Verify exported symbols"
-        working-directory: examples/simple-calc
-        run: |
-          LIB=$(find target/release -maxdepth 1 -name "libsimple_calc.so" | head -1)
-          echo "Library: $LIB"
-          MISSING=0
-          for sym in calc_add calc_sub calc_mul; do
-            if nm -gD --defined-only "$LIB" | grep -q " T ${sym}$"; then
-              echo "  FOUND: ${sym}"
-            else
-              echo "  MISSING: ${sym}"
-              MISSING=1
-            fi
-          done
-          if [ $MISSING -eq 1 ]; then
-            echo "FAIL: One or more expected symbols are missing"
-            exit 1
-          fi
-          echo "PASS: All expected symbols (calc_add, calc_sub, calc_mul) are present"
-
       # ════════════════════════════════════════════════════════════════════
       # Example 2: complex-kv-store
-      #   Pattern — C library compiled in via cc crate, wrapped by safe Rust.
+      #   Pattern — C library compiled in via cc, wrapped by hicc C++ adapter.
       # ════════════════════════════════════════════════════════════════════
 
       - name: "[complex-kv-store] Build C library and test binary"
@@ -101,11 +81,11 @@ jobs:
         working-directory: examples/complex-kv-store
         run: .c2rust/c/_build/test_kv
 
-      - name: "[complex-kv-store] Build Rust"
+      - name: "[complex-kv-store] Build Rust (using hicc)"
         working-directory: examples/complex-kv-store
         run: cargo build --release
 
-      - name: "[complex-kv-store] Test Rust (mirrors C test suite)"
+      - name: "[complex-kv-store] Test Rust (mirrors C test suite, via hicc)"
         working-directory: examples/complex-kv-store
         run: cargo test
 

@@ -1,30 +1,27 @@
-use std::path::PathBuf;
+// build.rs — compile the C kv_store source and the hicc C++ adapter.
+//
+// The C source (kv.c) is compiled by cc (C compiler) so that C-specific
+// implicit casts are accepted.  hicc-build compiles only the C++ adapter code
+// that is extracted from the hicc::cpp! blocks in src/ffi.rs.
 
 fn main() {
-    let c_root = PathBuf::from(".c2rust/c");
-    let c_include = c_root.join("include");
-    let c_src = c_root.join("src");
-
-    // Compile the C implementation into a static archive.
+    // 1. Compile the original C implementation with the C compiler.
     cc::Build::new()
-        .file(c_src.join("kv.c"))
-        .include(&c_include)
-        .compile("kv");
+        .file(".c2rust/c/src/kv.c")
+        .include(".c2rust/c/include")
+        .compile("kv_c");
 
-    // Re-run this script if the C sources change.
-    println!("cargo:rerun-if-changed={}", c_src.join("kv.c").display());
-    println!("cargo:rerun-if-changed={}", c_include.join("kv.h").display());
+    // 2. Extract hicc::cpp! blocks from src/ffi.rs and compile them as C++.
+    hicc_build::Build::new()
+        .rust_file("src/ffi.rs")
+        .include(".c2rust/c/include")
+        .compile("kv_adapter");
 
-    // Generate Rust bindings from kv.h (types + extern "C" function declarations).
-    // The actual function bodies come from the static archive compiled above.
-    let bindings = bindgen::Builder::default()
-        .header(c_include.join("kv.h").to_str().unwrap())
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
-        .generate()
-        .expect("Unable to generate bindings for kv.h");
-
-    let out_path = PathBuf::from(std::env::var("OUT_DIR").unwrap());
-    bindings
-        .write_to_file(out_path.join("bindings.rs"))
-        .expect("Couldn't write bindings!");
+    println!("cargo::rustc-link-lib=kv_c");
+    println!("cargo::rustc-link-lib=kv_adapter");
+    println!("cargo::rustc-link-lib=stdc++");
+    println!("cargo::rerun-if-changed=src/ffi.rs");
+    println!("cargo::rerun-if-changed=.c2rust/c/src/kv.c");
+    println!("cargo::rerun-if-changed=.c2rust/c/include/kv.h");
 }
+

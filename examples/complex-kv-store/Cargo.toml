@@ -7,6 +7,9 @@ edition = "2021"
 name = "kv_store"
 crate-type = ["rlib"]
 
+[dependencies]
+hicc = "0.2"
+
 [build-dependencies]
-bindgen = "0.69"
+hicc-build = "0.2"
 cc = "1.0"
