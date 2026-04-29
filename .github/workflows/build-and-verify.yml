@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build-and-verify:
-    name: Build C + Rust, verify symbol consistency
+    name: Build C + Rust, verify examples
     runs-on: ubuntu-latest
 
     steps:
@@ -21,7 +21,7 @@ jobs:
       - name: Install C build tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y cmake gcc libm-dev libclang-dev
+          sudo apt-get install -y cmake gcc libclang-dev binutils
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -32,83 +32,77 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            examples/c2rust-rs/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('examples/c2rust-rs/Cargo.toml') }}
+            examples/simple-calc/target
+            examples/complex-kv-store/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('examples/*/Cargo.toml') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      # ── Build C version ──────────────────────────────────────────────────
-      - name: Build C library
-        working-directory: examples/c2rust-rs
+      # ════════════════════════════════════════════════════════════════════
+      # Example 1: simple-calc
+      #   Pattern — pure Rust ABI replacement; no C compiled into Rust.
+      # ════════════════════════════════════════════════════════════════════
+
+      - name: "[simple-calc] Build Rust"
+        working-directory: examples/simple-calc
+        run: cargo build --release
+
+      - name: "[simple-calc] Test Rust"
+        working-directory: examples/simple-calc
+        run: cargo test
+
+      - name: "[simple-calc] Verify exported symbols"
+        working-directory: examples/simple-calc
+        run: |
+          LIB=$(find target/release -maxdepth 1 -name "libsimple_calc.so" | head -1)
+          echo "Library: $LIB"
+          MISSING=0
+          for sym in calc_add calc_sub calc_mul; do
+            if nm -gD --defined-only "$LIB" | grep -q " T ${sym}$"; then
+              echo "  FOUND: ${sym}"
+            else
+              echo "  MISSING: ${sym}"
+              MISSING=1
+            fi
+          done
+          if [ $MISSING -eq 1 ]; then
+            echo "FAIL: One or more expected symbols are missing"
+            exit 1
+          fi
+          echo "PASS: All expected symbols (calc_add, calc_sub, calc_mul) are present"
+
+      # ════════════════════════════════════════════════════════════════════
+      # Example 2: complex-kv-store
+      #   Pattern — C library compiled in via cc crate, wrapped by safe Rust.
+      # ════════════════════════════════════════════════════════════════════
+
+      - name: "[complex-kv-store] Build C library and test binary"
+        working-directory: examples/complex-kv-store
         run: |
           cmake -B .c2rust/c/_build -S .c2rust/c \
             -DCMAKE_BUILD_TYPE=Release \
             -Wno-dev
           cmake --build .c2rust/c/_build
 
-      # ── Run C tests ──────────────────────────────────────────────────────
-      - name: Run C tests
-        working-directory: examples/c2rust-rs
-        run: |
-          .c2rust/c/_build/test_calc
+      - name: "[complex-kv-store] Run C tests"
+        working-directory: examples/complex-kv-store
+        run: .c2rust/c/_build/test_kv
 
-      # ── Extract C symbols ────────────────────────────────────────────────
-      - name: Extract C exported symbols
-        working-directory: examples/c2rust-rs
-        run: |
-          C_LIB=$(find .c2rust/c/_build -name "libcalc.so" | head -1)
-          echo "C library: $C_LIB"
-          nm -g --defined-only "$C_LIB" \
-            | grep " T \| W " \
-            | awk '{print $3}' \
-            | grep -v "^_" \
-            | sort \
-            > .c2rust/c/symbols_c.txt
-          echo "C exported symbols:"
-          cat .c2rust/c/symbols_c.txt
-
-      # ── Build Rust version ───────────────────────────────────────────────
-      - name: Build Rust FFI library
-        working-directory: examples/c2rust-rs
+      - name: "[complex-kv-store] Build Rust"
+        working-directory: examples/complex-kv-store
         run: cargo build --release
 
-      # ── Run Rust tests ───────────────────────────────────────────────────
-      - name: Run Rust tests
-        working-directory: examples/c2rust-rs
+      - name: "[complex-kv-store] Test Rust"
+        working-directory: examples/complex-kv-store
         run: cargo test
 
-      # ── Verify symbol consistency ─────────────────────────────────────────
-      - name: Verify exported symbol consistency
-        working-directory: examples/c2rust-rs
+      # ════════════════════════════════════════════════════════════════════
+      # Validate SKILL structure
+      # ════════════════════════════════════════════════════════════════════
+
+      - name: Validate c2rust-ffi-creator skill
         run: |
-          RUST_LIB=$(find target/release -maxdepth 1 -name "libc2rust_rs.so" -o -name "libc2rust_rs.dylib" 2>/dev/null | head -1)
-          echo "Rust library: $RUST_LIB"
-
-          nm -g --defined-only "$RUST_LIB" \
-            | grep " T \| W " \
-            | awk '{print $3}' \
-            | grep -v "^_" \
-            | sort \
-            > .c2rust/symbols_rust.txt
-
-          echo "Rust exported symbols:"
-          cat .c2rust/symbols_rust.txt
-
-          echo ""
-          echo "Symbol comparison (C vs Rust):"
-          MISSING=$(comm -23 .c2rust/c/symbols_c.txt .c2rust/symbols_rust.txt || true)
-          if [[ -n "$MISSING" ]]; then
-            echo "FAIL: The following C symbols are missing from the Rust library:"
-            echo "$MISSING"
-            exit 1
-          else
-            echo "PASS: All C exported symbols are present in the Rust library"
-          fi
-
-      # ── Validate skill structure ─────────────────────────────────────────
-      - name: Validate r2rust-ffi-creator skill
-        run: |
-          python3 - c2rust-ffi-creator/r2rust-ffi-creator << 'EOF'
+          python3 - c2rust-ffi-creator << 'EOF'
           import sys, re
           from pathlib import Path
 

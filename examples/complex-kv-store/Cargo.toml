@@ -1,0 +1,12 @@
+[package]
+name = "complex-kv-store"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "kv_store"
+crate-type = ["rlib"]
+
+[build-dependencies]
+bindgen = "0.69"
+cc = "1.0"
