@@ -1,0 +1,15 @@
+[package]
+name = "cpp-string-utils"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "str_counter"
+crate-type = ["rlib"]
+
+[dependencies]
+hicc = "0.2"
+
+[build-dependencies]
+hicc-build = "0.2"
+cc = "1.0"

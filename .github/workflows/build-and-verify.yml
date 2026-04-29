@@ -21,7 +21,7 @@ jobs:
       - name: Install C build tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y cmake gcc libclang-dev binutils
+          sudo apt-get install -y cmake gcc g++ libclang-dev binutils
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -34,6 +34,7 @@ jobs:
             ~/.cargo/git
             examples/simple-calc/target
             examples/complex-kv-store/target
+            examples/cpp-string-utils/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('examples/*/Cargo.toml') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
@@ -106,6 +107,31 @@ jobs:
 
       - name: "[complex-kv-store] Test Rust (mirrors C test suite)"
         working-directory: examples/complex-kv-store
+        run: cargo test
+
+      # ════════════════════════════════════════════════════════════════════
+      # Example 3: cpp-string-utils
+      #   Pattern — C library wrapped via hicc (C++ adapter layer).
+      # ════════════════════════════════════════════════════════════════════
+
+      - name: "[cpp-string-utils] Build C library and test binary"
+        working-directory: examples/cpp-string-utils
+        run: |
+          cmake -B .c2rust/c/_build -S .c2rust/c \
+            -DCMAKE_BUILD_TYPE=Release \
+            -Wno-dev
+          cmake --build .c2rust/c/_build
+
+      - name: "[cpp-string-utils] Run C tests"
+        working-directory: examples/cpp-string-utils
+        run: .c2rust/c/_build/test_str_counter
+
+      - name: "[cpp-string-utils] Build Rust (using hicc)"
+        working-directory: examples/cpp-string-utils
+        run: cargo build --release
+
+      - name: "[cpp-string-utils] Test Rust (mirrors C test suite, via hicc)"
+        working-directory: examples/cpp-string-utils
         run: cargo test
 
       # ════════════════════════════════════════════════════════════════════
