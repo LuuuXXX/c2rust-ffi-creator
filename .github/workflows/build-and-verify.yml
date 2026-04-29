@@ -32,14 +32,14 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            c2rust-rs/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('c2rust-rs/Cargo.toml') }}
+            examples/c2rust-rs/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('examples/c2rust-rs/Cargo.toml') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
       # ── Build C version ──────────────────────────────────────────────────
       - name: Build C library
-        working-directory: c2rust-rs
+        working-directory: examples/c2rust-rs
         run: |
           cmake -B .c2rust/c/_build -S .c2rust/c \
             -DCMAKE_BUILD_TYPE=Release \
@@ -48,13 +48,13 @@ jobs:
 
       # ── Run C tests ──────────────────────────────────────────────────────
       - name: Run C tests
-        working-directory: c2rust-rs
+        working-directory: examples/c2rust-rs
         run: |
           .c2rust/c/_build/test_calc
 
       # ── Extract C symbols ────────────────────────────────────────────────
       - name: Extract C exported symbols
-        working-directory: c2rust-rs
+        working-directory: examples/c2rust-rs
         run: |
           C_LIB=$(find .c2rust/c/_build -name "libcalc.so" | head -1)
           echo "C library: $C_LIB"
@@ -69,17 +69,17 @@ jobs:
 
       # ── Build Rust version ───────────────────────────────────────────────
       - name: Build Rust FFI library
-        working-directory: c2rust-rs
+        working-directory: examples/c2rust-rs
         run: cargo build --release
 
       # ── Run Rust tests ───────────────────────────────────────────────────
       - name: Run Rust tests
-        working-directory: c2rust-rs
+        working-directory: examples/c2rust-rs
         run: cargo test
 
       # ── Verify symbol consistency ─────────────────────────────────────────
       - name: Verify exported symbol consistency
-        working-directory: c2rust-rs
+        working-directory: examples/c2rust-rs
         run: |
           RUST_LIB=$(find target/release -maxdepth 1 -name "libc2rust_rs.so" -o -name "libc2rust_rs.dylib" 2>/dev/null | head -1)
           echo "Rust library: $RUST_LIB"
@@ -108,7 +108,7 @@ jobs:
       # ── Validate skill structure ─────────────────────────────────────────
       - name: Validate r2rust-ffi-creator skill
         run: |
-          python3 - r2rust-ffi-creator << 'EOF'
+          python3 - c2rust-ffi-creator/r2rust-ffi-creator << 'EOF'
           import sys, re
           from pathlib import Path
 
