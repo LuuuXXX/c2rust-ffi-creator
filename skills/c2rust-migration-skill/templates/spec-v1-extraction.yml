@@ -1,0 +1,125 @@
+# Spec v1（as-is）提取模板
+#
+# 使用说明：
+#   1. 用 scripts/scan_headers.py 生成初始骨架。
+#   2. 人工逐字段补全行为契约，标记 "TODO" 项需后续确认。
+#   3. 最终文件即为 Phase 1 实现的唯一规格依据。
+
+metadata:
+  project: "TODO: 填写 C 项目名称"
+  version: "TODO: 填写被分析的版本号或 commit"
+  extracted_by: "TODO: 填写提取人"
+  extracted_at: "TODO: YYYY-MM-DD"
+  headers_scanned: []   # 例如: ["include/foo.h", "include/bar.h"]
+  notes: ""
+
+# ──────────────────────────────────────────────────────────────────
+# 类型定义（typedef / 枚举 / 结构体）
+# ──────────────────────────────────────────────────────────────────
+types:
+  - name: "TODO: 类型名"
+    kind: "typedef | struct | enum | union"
+    c_definition: |
+      TODO: 粘贴原始 C 定义
+    rust_repr: "#[repr(C)]"   # 或 "#[repr(C, packed)]" 等
+    fields: []   # 结构体字段列表，参见下面的 struct_field 格式
+    notes: ""
+
+  # struct_field 格式示例（嵌入 fields 列表）：
+  #   - name: ctx
+  #     c_type: "void *"
+  #     rust_type: "*mut std::ffi::c_void"
+  #     size_bytes: 8         # 64-bit 平台
+  #     offset_bytes: 0
+  #     notes: "不透明句柄，不透出内部类型"
+
+# ──────────────────────────────────────────────────────────────────
+# 北向接口（北向：模块对外暴露给上层调用方的 API）
+# ──────────────────────────────────────────────────────────────────
+functions:
+  - name: "TODO: 函数名"
+    header_file: "TODO: 所在头文件路径"
+    c_signature: "TODO: 完整 C 函数签名，含参数名"
+    # ── 参数说明 ──────────────────────────────────────────────────
+    params:
+      - name: "TODO: 参数名"
+        c_type: "TODO: C 类型"
+        rust_type: "TODO: 对应 Rust FFI 类型"
+        nullable: false       # 是否允许传 NULL / nullptr
+        direction: "in | out | in_out"
+        ownership: "borrowed | owned | caller_alloc_callee_fill"
+        # 说明：
+        #   borrowed         = 调用方保留所有权，被调用方不保留引用
+        #   owned            = 所有权转移给被调用方（或反之）
+        #   caller_alloc_callee_fill = 调用方分配 buffer，被调用方填充内容
+        length_field: ""      # 若为 buffer，对应的长度参数名
+        notes: ""
+    # ── 返回值 ────────────────────────────────────────────────────
+    return:
+      c_type: "TODO: C 返回类型"
+      rust_type: "TODO: Rust FFI 返回类型"
+      error_codes:
+        - value: 0
+          meaning: "成功"
+        - value: -1
+          meaning: "TODO: 填写具体含义"
+      notes: ""
+    # ── 行为契约 ──────────────────────────────────────────────────
+    contract:
+      preconditions: []   # 例如: ["ctx 必须已通过 foo_init() 初始化"]
+      postconditions: []  # 例如: ["成功时 *out 非 NULL，调用方负责通过 foo_free() 释放"]
+      error_behavior: ""  # 出错时 out 参数的状态
+      idempotent: false   # 多次调用是否等价
+    # ── 资源管理 ──────────────────────────────────────────────────
+    memory:
+      allocator: "TODO: libc malloc | custom | caller"
+      deallocated_by: "TODO: 对应的 free 函数名或调用方"
+      notes: ""
+    # ── 并发 ──────────────────────────────────────────────────────
+    concurrency:
+      thread_safe: false        # 是否可并发调用
+      reentrant: false          # 是否可重入
+      requires_external_lock: false
+      lock_notes: ""
+    # ── 回调 ──────────────────────────────────────────────────────
+    callbacks: []
+    # 回调格式示例：
+    #   - param_name: "on_event"
+    #     signature: "void (*on_event)(int event_type, void *user_data)"
+    #     invocation_thread: "calling thread | background thread | any"
+    #     invocation_timing: "synchronous | asynchronous | deferred"
+    #     reentrant: false
+    #     lifetime: "valid until foo_destroy() | valid for duration of call"
+    #     user_data_param: "user_data"
+    #     user_data_lifetime: "TODO"
+    # ── 全局状态 ──────────────────────────────────────────────────
+    global_state:
+      depends_on_init: false    # 是否依赖全局 init 函数
+      init_function: ""
+      modifies_global: false
+      notes: ""
+    # ── 风险信号（由 scan_headers.py 自动填充，人工确认）─────────────
+    risk_signals: []
+    # 格式: [{type: "CALLBACK", detail: "...", confirmed: false, decision: ""}]
+    notes: ""
+
+  # ──── 函数模板结束 ────────────────────────────────────────────────
+  # 复制上述 block 为每个北向函数创建一个条目。
+
+# ──────────────────────────────────────────────────────────────────
+# 已知边界条件与"历史怪癖"
+# ──────────────────────────────────────────────────────────────────
+known_edge_cases:
+  - description: "TODO: 描述已知的边界行为或历史遗留怪癖"
+    affects_functions: []
+    phase1_strategy: "replicate | document_and_defer_to_phase2"
+    notes: ""
+
+# ──────────────────────────────────────────────────────────────────
+# 人工确认记录
+# ──────────────────────────────────────────────────────────────────
+sign_off:
+  reviewed_by: "TODO: 姓名"
+  reviewed_at: "TODO: YYYY-MM-DD"
+  confirmed: false
+  comments: ""

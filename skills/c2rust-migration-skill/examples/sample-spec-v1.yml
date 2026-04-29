@@ -1,0 +1,325 @@
+# Spec v1 (as-is) — 示例：libfoo 项目
+#
+# 本文件是 scan_headers.py + 人工补全后的完整示例。
+# 用于演示 spec-v1-extraction.yml 模板的填写方式。
+
+metadata:
+  project: "libfoo"
+  version: "v1.4.2 (commit: abc1234)"
+  extracted_by: "张三"
+  extracted_at: "2024-03-15"
+  parser: "regex (降级模式)"
+  headers_scanned:
+    - "include/foo.h"
+  notes: "libfoo 是一个简单的连接池管理库，对外暴露句柄式 API"
+
+# ──────────────────────────────────────────────────────────────────
+# 类型定义
+# ──────────────────────────────────────────────────────────────────
+types:
+  - name: FooCtx
+    kind: struct
+    c_definition: |
+      /* 不透明结构体，内部定义在 foo_internal.h */
+      typedef struct FooCtx FooCtx;
+    rust_repr: "#[repr(C)]"
+    fields: []
+    notes: "不透明句柄，不透出内部字段；Rust 侧映射为 enum FooCtx {} （空枚举）"
+
+  - name: FooError
+    kind: enum
+    c_definition: |
+      typedef enum FooError {
+          FOO_OK        =  0,
+          FOO_ERR_NULL  = -1,
+          FOO_ERR_OOM   = -2,
+          FOO_ERR_INVAL = -3,
+      } FooError;
+    rust_repr: "#[repr(i32)]"
+    fields: []
+    notes: "底层类型为 int（i32）；Rust 侧使用同名 enum + TryFrom<i32>"
+
+  - name: FooConfig
+    kind: struct
+    c_definition: |
+      typedef struct FooConfig {
+          int           max_connections;
+          size_t        buffer_size;
+          unsigned long timeout_ms;
+      } FooConfig;
+    rust_repr: "#[repr(C)]"
+    fields:
+      - name: max_connections
+        c_type: "int"
+        rust_type: "std::ffi::c_int"
+        size_bytes: 4
+        offset_bytes: 0
+        notes: ""
+      - name: buffer_size
+        c_type: "size_t"
+        rust_type: "usize"
+        size_bytes: 8
+        offset_bytes: 8
+        notes: "64-bit 平台；32-bit 平台为 4 字节，需注意跨平台"
+      - name: timeout_ms
+        c_type: "unsigned long"
+        rust_type: "u64"
+        size_bytes: 8
+        offset_bytes: 16
+        notes: "决策：统一映射为 u64（64-bit 平台 long = 8 字节）"
+    notes: "sizeof(FooConfig) = 24（64-bit Linux）；已通过 static_assert 验证"
+
+# ──────────────────────────────────────────────────────────────────
+# 北向接口
+# ──────────────────────────────────────────────────────────────────
+functions:
+  - name: foo_init
+    header_file: "include/foo.h"
+    c_signature: "int foo_init(FooCtx **ctx, const FooConfig *cfg)"
+    params:
+      - name: ctx
+        c_type: "FooCtx **"
+        rust_type: "*mut *mut FooCtx"
+        nullable: false
+        direction: out
+        ownership: "owned"
+        length_field: ""
+        notes: "成功时 *ctx 指向已分配的上下文，由 foo_destroy() 释放"
+      - name: cfg
+        c_type: "const FooConfig *"
+        rust_type: "*const FooConfig"
+        nullable: false
+        direction: in
+        ownership: "borrowed"
+        length_field: ""
+        notes: "函数内部复制配置，调用返回后 cfg 可释放"
+    return:
+      c_type: "int"
+      rust_type: "std::ffi::c_int"
+      error_codes:
+        - value: 0
+          meaning: "成功"
+        - value: -1
+          meaning: "FOO_ERR_NULL：ctx 或 cfg 为 NULL"
+        - value: -2
+          meaning: "FOO_ERR_OOM：内存分配失败"
+        - value: -3
+          meaning: "FOO_ERR_INVAL：cfg 中 max_connections ≤ 0"
+      notes: ""
+    contract:
+      preconditions:
+        - "ctx != NULL"
+        - "cfg != NULL"
+        - "cfg->max_connections > 0"
+      postconditions:
+        - "返回 0 时，*ctx 非 NULL 且已完全初始化"
+        - "返回非 0 时，*ctx 保持 NULL（不写入）"
+      error_behavior: "失败时 *ctx 保持 NULL，不分配任何资源"
+      idempotent: false
+    memory:
+      allocator: "libc malloc"
+      deallocated_by: "foo_destroy()"
+      notes: ""
+    concurrency:
+      thread_safe: false
+      reentrant: false
+      requires_external_lock: true
+      lock_notes: "同一个 ctx 变量不可并发调用 foo_init"
+    callbacks: []
+    global_state:
+      depends_on_init: true
+      init_function: "foo_global_init()"
+      modifies_global: false
+      notes: "需先调用 foo_global_init()，否则返回 FOO_ERR_INVAL"
+    risk_signals:
+      - type: "OUT_BUF"
+        detail: "函数包含 out 指针参数（FooCtx**）"
+        confirmed: true
+        decision: "接受：使用 Handle 模式，foo_init 负责分配，foo_destroy 负责释放"
+      - type: "GLOBAL_STATE"
+        detail: "依赖 foo_global_init() 全局状态"
+        confirmed: true
+        decision: "接受：Rust 侧使用 std::sync::Once 保护全局初始化"
+    notes: ""
+
+  - name: foo_destroy
+    header_file: "include/foo.h"
+    c_signature: "void foo_destroy(FooCtx *ctx)"
+    params:
+      - name: ctx
+        c_type: "FooCtx *"
+        rust_type: "*mut FooCtx"
+        nullable: true
+        direction: in
+        ownership: "owned"
+        length_field: ""
+        notes: "ctx 为 NULL 时安全（no-op）"
+    return:
+      c_type: "void"
+      rust_type: "()"
+      error_codes: []
+      notes: ""
+    contract:
+      preconditions: []
+      postconditions:
+        - "ctx 指向的内存已释放，ctx 本身变为悬垂指针（调用方不得再使用）"
+      error_behavior: "不适用"
+      idempotent: false
+    memory:
+      allocator: "libc malloc（由 foo_init 分配）"
+      deallocated_by: "本函数"
+      notes: "不可对同一 ctx 调用两次（double-free）"
+    concurrency:
+      thread_safe: false
+      reentrant: false
+      requires_external_lock: true
+      lock_notes: "不可与其他 foo_* 函数并发调用同一 ctx"
+    callbacks: []
+    global_state:
+      depends_on_init: false
+      init_function: ""
+      modifies_global: false
+      notes: ""
+    risk_signals: []
+    notes: ""
+
+  - name: foo_version
+    header_file: "include/foo.h"
+    c_signature: "int foo_version(void)"
+    params: []
+    return:
+      c_type: "int"
+      rust_type: "std::ffi::c_int"
+      error_codes:
+        - value: 10402
+          meaning: "版本号，格式：major*10000 + minor*100 + patch（例如 10402 = v1.4.2）"
+      notes: ""
+    contract:
+      preconditions: []
+      postconditions:
+        - "始终返回正整数版本号"
+      error_behavior: "不适用（无错误路径）"
+      idempotent: true
+    memory:
+      allocator: "不适用"
+      deallocated_by: "不适用"
+      notes: ""
+    concurrency:
+      thread_safe: true
+      reentrant: true
+      requires_external_lock: false
+      lock_notes: ""
+    callbacks: []
+    global_state:
+      depends_on_init: false
+      init_function: ""
+      modifies_global: false
+      notes: ""
+    risk_signals: []
+    notes: "纯函数，无副作用，Tier 0 理想候选"
+
+  - name: foo_async_op
+    header_file: "include/foo.h"
+    c_signature: "int foo_async_op(FooCtx *ctx, void (*on_done)(int status, void *user_data), void *user_data)"
+    params:
+      - name: ctx
+        c_type: "FooCtx *"
+        rust_type: "*mut FooCtx"
+        nullable: false
+        direction: in
+        ownership: "borrowed"
+        length_field: ""
+        notes: ""
+      - name: on_done
+        c_type: "void (*)(int status, void *user_data)"
+        rust_type: "Option<unsafe extern \"C\" fn(status: c_int, user_data: *mut c_void)>"
+        nullable: true
+        direction: in
+        ownership: "borrowed"
+        length_field: ""
+        notes: "NULL 表示不需要回调通知"
+      - name: user_data
+        c_type: "void *"
+        rust_type: "*mut std::ffi::c_void"
+        nullable: true
+        direction: in
+        ownership: "borrowed"
+        length_field: ""
+        notes: "调用方负责保证 user_data 在回调触发前有效"
+    return:
+      c_type: "int"
+      rust_type: "std::ffi::c_int"
+      error_codes:
+        - value: 0
+          meaning: "操作已成功入队（回调将在后台线程触发）"
+        - value: -1
+          meaning: "FOO_ERR_NULL：ctx 为 NULL"
+        - value: -3
+          meaning: "FOO_ERR_INVAL：ctx 未初始化或已销毁"
+      notes: ""
+    contract:
+      preconditions:
+        - "ctx 已通过 foo_init() 成功初始化"
+      postconditions:
+        - "返回 0 时，on_done 将在后台线程被调用一次"
+        - "on_done 调用后，user_data 不再被访问"
+      error_behavior: "失败时 on_done 不会被调用"
+      idempotent: false
+    memory:
+      allocator: "不分配额外内存"
+      deallocated_by: "不适用"
+      notes: ""
+    concurrency:
+      thread_safe: true
+      reentrant: true
+      requires_external_lock: false
+      lock_notes: "内部已加锁；on_done 在内部线程池线程中调用"
+    callbacks:
+      - param_name: on_done
+        signature: "void (*on_done)(int status, void *user_data)"
+        invocation_thread: "background thread（内部线程池）"
+        invocation_timing: "asynchronous"
+        reentrant: false
+        lifetime: "仅在操作完成时调用一次，之后不再持有"
+        user_data_param: user_data
+        user_data_lifetime: "调用方保证在 on_done 触发前有效"
+    global_state:
+      depends_on_init: true
+      init_function: "foo_global_init()"
+      modifies_global: false
+      notes: ""
+    risk_signals:
+      - type: "CALLBACK"
+        detail: "函数包含回调函数指针参数"
+        confirmed: true
+        decision: "接受：在 Rust FFI 层使用 Box<dyn FnOnce> + into_raw 桥接；Phase 1 保持 C 回调语义"
+      - type: "OPAQUE"
+        detail: "user_data 为 void* 不透明指针"
+        confirmed: true
+        decision: "接受：Phase 1 保持 void* 语义，Phase 2 考虑泛型化"
+    notes: "高风险接口，建议排在 Phase 1 后期实现"
+
+# ──────────────────────────────────────────────────────────────────
+# 已知边界条件
+# ──────────────────────────────────────────────────────────────────
+known_edge_cases:
+  - description: "foo_version() 的返回格式（major*10000+minor*100+patch）未在头文件中文档化"
+    affects_functions:
+      - foo_version
+    phase1_strategy: replicate
+    notes: "Phase 1 完全复制此行为；Phase 2 可考虑改为语义化版本字符串接口"
+
+  - description: "foo_destroy(NULL) 为 no-op（历史行为，未文档化）"
+    affects_functions:
+      - foo_destroy
+    phase1_strategy: replicate
+    notes: "Rust 实现须复制此行为（在 Drop impl 中检查 NULL）"
+
+# ──────────────────────────────────────────────────────────────────
+# 人工确认记录
+# ──────────────────────────────────────────────────────────────────
+sign_off:
+  reviewed_by: "张三"
+  reviewed_at: "2024-03-20"
+  confirmed: true
+  comments: "所有 TODO 已清空；风险信号处置决策已确认。可进入 ABI 冻结流程。"
