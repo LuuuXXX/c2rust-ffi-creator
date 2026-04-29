@@ -11,7 +11,6 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${1:-$(pwd)}"
 OS_TYPE="$(uname -s)"
 
@@ -85,15 +84,33 @@ print('\n'.join(arts))
     C_LIB_SO=""
     C_LIB_A=""
     if [[ -n "${ARTIFACTS_JSON}" ]]; then
+        SO_FROM_SPEC=()
+        A_FROM_SPEC=()
         while IFS= read -r art; do
             [[ -z "${art}" ]] && continue
             art_path="${C_DIR}/${art}"
             if [[ "${art_path}" == *.so || "${art_path}" == *.dylib ]]; then
-                C_LIB_SO="${art_path}"
+                SO_FROM_SPEC+=("${art_path}")
             elif [[ "${art_path}" == *.a ]]; then
-                C_LIB_A="${art_path}"
+                A_FROM_SPEC+=("${art_path}")
             fi
         done <<< "${ARTIFACTS_JSON}"
+        if [[ ${#SO_FROM_SPEC[@]} -gt 1 ]]; then
+            echo "✗ 错误：spec.json output_artifacts 中包含多个动态库，请只保留一个目标产物：" >&2
+            printf '    %s\n' "${SO_FROM_SPEC[@]}" >&2
+            exit 1
+        elif [[ ${#SO_FROM_SPEC[@]} -eq 1 ]]; then
+            C_LIB_SO="${SO_FROM_SPEC[0]}"
+        fi
+        if [[ -z "${C_LIB_SO}" ]]; then
+            if [[ ${#A_FROM_SPEC[@]} -gt 1 ]]; then
+                echo "✗ 错误：spec.json output_artifacts 中包含多个静态库，请只保留一个目标产物：" >&2
+                printf '    %s\n' "${A_FROM_SPEC[@]}" >&2
+                exit 1
+            elif [[ ${#A_FROM_SPEC[@]} -eq 1 ]]; then
+                C_LIB_A="${A_FROM_SPEC[0]}"
+            fi
+        fi
     fi
 
     # 回退：在构建目录扫描，如果有多个候选则报错

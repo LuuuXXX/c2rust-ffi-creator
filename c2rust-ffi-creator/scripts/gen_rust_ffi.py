@@ -53,6 +53,26 @@ def header_to_module_path(header: str) -> list:
 
     parts = [re.sub(r"[^a-zA-Z0-9_]", "_", part) for part in parts if part]
 
+    # Ensure each part is a valid Rust identifier:
+    # 1. Prefix with '_' if it starts with a digit
+    # 2. Append '_' if it is a Rust keyword (raw identifiers r# are not valid in mod paths)
+    _RUST_KEYWORDS = {
+        "as", "break", "const", "continue", "crate", "else", "enum", "extern",
+        "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod",
+        "move", "mut", "pub", "ref", "return", "self", "Self", "static", "struct",
+        "super", "trait", "true", "type", "unsafe", "use", "where", "while",
+        "abstract", "become", "box", "do", "final", "macro", "override", "priv",
+        "typeof", "unsized", "virtual", "yield", "async", "await", "dyn", "try",
+    }
+    normalized = []
+    for part in parts:
+        if part and part[0].isdigit():
+            part = "_" + part
+        if part in _RUST_KEYWORDS:
+            part = part + "_"
+        normalized.append(part)
+    parts = normalized
+
     return parts if parts else [re.sub(r"[^a-zA-Z0-9_]", "_", p.stem)]
 
 

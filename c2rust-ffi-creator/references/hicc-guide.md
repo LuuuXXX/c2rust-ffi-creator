@@ -56,21 +56,34 @@ fn main() {
 
 适用于保留 C 实现、用 Rust 封装对外接口的场景。
 
+当前推荐方式是由 `build.rs` 将 C 对象/静态库编译并链接进 Rust crate，
+C 实现直接导出公开符号，Rust 侧只需声明 `extern "C"` 绑定并透传调用，
+**不需要在 Rust wrapper 上添加 `#[no_mangle]`**（避免重复定义/循环引用）。
+
 ```rust
 // ffi/src/foo.rs
 use std::ffi::c_int;
 
 // 声明 C 函数（须与 C 头文件签名完全匹配）
-extern "C" {
-    fn foo_init(ctx: *mut FooCtx) -> c_int;
-    fn foo_destroy(ctx: *mut FooCtx);
+mod sys {
+    use std::ffi::c_int;
+    extern "C" {
+        // 用 link_name 绑定实际 C 符号，Rust 侧使用 __c_ 前缀避免名称冲突
+        #[link_name = "foo_init"]
+        pub fn __c_foo_init(ctx: *mut super::FooCtx) -> c_int;
+        #[link_name = "foo_destroy"]
+        pub fn __c_foo_destroy(ctx: *mut super::FooCtx);
+    }
 }
 
 /// # Safety
 /// ctx 必须是有效的、未经初始化的 FooCtx 指针。
-#[no_mangle]
-pub unsafe extern "C" fn c2rust_foo_init(ctx: *mut FooCtx) -> c_int {
-    foo_init(ctx)
+pub unsafe fn foo_init(ctx: *mut FooCtx) -> c_int {
+    sys::__c_foo_init(ctx)
+}
+
+pub unsafe fn foo_destroy(ctx: *mut FooCtx) {
+    sys::__c_foo_destroy(ctx)
 }
 ```
 
@@ -120,8 +133,8 @@ pub struct FooCtx {
 
 ## 导出符号命名规范
 
-- 原 C 函数 `foo_init` → Rust 导出函数 `foo_init`（保持名称一致，使用 `#[no_mangle]`）
-- 若需要命名空间隔离，可添加前缀：`c2rust_foo_init`，并在 `symbols_expected.txt` 中注明映射关系。
+- 原 C 函数 `foo_init` 由 `build.rs` 编译/链接的 C 对象直接导出，符号名保持 `foo_init` 不变。
+- Rust 侧通过 `#[link_name = "foo_init"]` 绑定 C 实现（内部命名为 `__c_foo_init`），wrapper 函数**不添加 `#[no_mangle]`**，避免 release 构建中重复定义或循环引用。
 
 ---
 

@@ -64,8 +64,8 @@ diff c_symbols.txt rust_symbols_filtered.txt
 
 **若有差异**：
 
-- `< foo_bar`（仅在 C 中）：对应 Rust 函数缺少 `#[no_mangle]`，或函数名拼写有误。
-- `> foo_bar`（仅在 Rust 中）：Rust 新增了 C 中不存在的导出符号，需检查是否合理。
+- `< foo_bar`（仅在 C 中）：Rust 产物中缺少该符号。常见原因：`ffi/build.rs` 未将对应 C 源文件编译并链接进来，或 `spec.json` 的 `output_artifacts` 指向了错误的产物路径。
+- `> foo_bar`（仅在 Rust 中）：Rust 产物多出了 C 中不存在的导出符号，需检查 `ffi/build.rs` 是否链接了额外的目标文件。
 
 ---
 
@@ -99,24 +99,23 @@ bar_write
 
 ## 常见问题
 
-### 符号被 Rust 混淆（mangled）
+### 符号缺失（C 有但 Rust 产物没有）
 
-原因：未添加 `#[no_mangle]`。
+原因：`ffi/build.rs` 未将对应 C 源文件或静态库编译并链接进来。
 
-修复：
-
-```rust
-#[no_mangle]
-pub extern "C" fn foo_init(ctx: *mut FooCtx) -> std::ffi::c_int { ... }
-```
+排查步骤：
+1. 检查 `ffi/build.rs` 中 `hicc_build::Build::new().file(...)` 是否覆盖了所有需要的 C 源文件。
+2. 检查 `spec.json` 的 `output_artifacts` 字段是否正确指向构建产物（`.so` 或 `.a`）。
+3. 确认 C 源文件中的函数已在头文件中声明，并被正确编译。
 
 ### 符号可见性为 local（小写 `t`/`d`）
 
 原因：函数未标记为 `pub`，或 crate-type 配置不正确。
 
 修复：
-1. 确认函数为 `pub extern "C"`。
+1. 确认函数为 `pub extern "C"`（若 Rust 侧需要重导出的话）。
 2. 确认 `Cargo.toml` 中 `crate-type = ["cdylib", "staticlib"]`。
+3. 大多数情况下，符号应由 C 实现通过 `build.rs` 链接直接导出，Rust wrapper **不需要** `#[no_mangle]`。
 
 ### C 使用了弱符号（weak symbol）
 
@@ -124,12 +123,6 @@ pub extern "C" fn foo_init(ctx: *mut FooCtx) -> std::ffi::c_int { ... }
 __attribute__((weak)) int foo_optional(void) { return -1; }
 ```
 
-Rust 暂不直接支持弱符号，可用以下方式模拟：
+弱符号会由 C 实现通过 `build.rs` 链接导出，Rust 侧只需正常声明 `extern "C"` 绑定即可。
 
-```rust
-#[no_mangle]
-#[linkage = "weak"]  // 需要 nightly 或 cfg(target_os = "linux")
-pub extern "C" fn foo_optional() -> std::ffi::c_int { -1 }
-```
-
-若无法模拟，在 `symbols_expected.txt` 中注明并豁免该符号的比较。
+若无法包含 C 实现，在 `symbols_expected.txt` 中注明并豁免该符号的比较。

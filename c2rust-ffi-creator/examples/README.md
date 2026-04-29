@@ -27,7 +27,7 @@ c_project/
 ```
 c2rust-rs/ffi/src/
 ├── lib.rs                # pub mod strbuf;
-└── strbuf.rs             # extern "C" + #[no_mangle] 封装
+└── strbuf.rs             # extern "C" FFI 绑定
 ```
 
 由于 `include/strbuf.h` 的路径只有一层（剥离 `include/` 前缀后为 `strbuf`），

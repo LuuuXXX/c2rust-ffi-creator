@@ -14,7 +14,6 @@
 """
 
 import sys
-import os
 import re
 import json
 from pathlib import Path
@@ -161,12 +160,12 @@ def find_test_coverage_in_files(test_files: list, module_name: str):
 
 def detect_build_system(c_dir: Path):
     if (c_dir / "CMakeLists.txt").exists():
-        return "cmake", "cmake -B build && cmake --build build", "ctest --test-dir build"
+        return "cmake", ["cmake", "-B", "build", "&&", "cmake", "--build", "build"], ["ctest", "--test-dir", "build"]
     if (c_dir / "configure.ac").exists() or (c_dir / "configure").exists():
-        return "autoconf", "./configure && make", "make check"
+        return "autoconf", ["./configure", "&&", "make"], ["make", "check"]
     if (c_dir / "Makefile").exists():
-        return "make", "make", "make test"
-    return "unknown", "make", "make test"
+        return "make", ["make"], ["make", "test"]
+    return "unknown", ["make"], ["make", "test"]
 
 
 # ──────────────────────────────────────────────
@@ -261,7 +260,7 @@ def analyze(c_dir: str):
 
     # 写入 spec.json
     spec_path = base / "spec.json"
-    spec_path.write_text(json.dumps(spec, indent=2, ensure_ascii=False))
+    spec_path.write_text(json.dumps(spec, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"✓ 已生成 spec.json：{spec_path}")
 
     # 生成 interfaces.md
@@ -313,7 +312,7 @@ def analyze(c_dir: str):
         md_lines.append("")
 
     iface_path = base / "interfaces.md"
-    iface_path.write_text("\n".join(md_lines))
+    iface_path.write_text("\n".join(md_lines), encoding="utf-8")
     print(f"✓ 已生成 interfaces.md：{iface_path}")
 
     print(f"\n共分析 {len(spec['modules'])} 个模块。")
