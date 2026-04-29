@@ -37,24 +37,18 @@ mod sys {
 
 /// # Safety
 /// 调用方须确保所有指针参数有效且生命周期覆盖本次调用。
-/// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
-#[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn strbuf_init(buf: *mut StrbufT, initial_cap: usize) -> c_int {
     sys::__c_strbuf_init(buf, initial_cap)
 }
 
 /// # Safety
 /// 调用方须确保所有指针参数有效且生命周期覆盖本次调用。
-/// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
-#[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn strbuf_append(buf: *mut StrbufT, str: *const c_char) -> c_int {
     sys::__c_strbuf_append(buf, str)
 }
 
 /// # Safety
 /// 调用方须确保所有指针参数有效且生命周期覆盖本次调用。
-/// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
-#[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn strbuf_append_len(
     buf: *mut StrbufT,
     data: *const c_char,
@@ -65,16 +59,12 @@ pub unsafe extern "C" fn strbuf_append_len(
 
 /// # Safety
 /// 调用方须确保所有指针参数有效且生命周期覆盖本次调用。
-/// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
-#[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn strbuf_reset(buf: *mut StrbufT) {
     sys::__c_strbuf_reset(buf)
 }
 
 /// # Safety
 /// 调用方须确保所有指针参数有效且生命周期覆盖本次调用。
-/// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
-#[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn strbuf_free(buf: *mut StrbufT) {
     sys::__c_strbuf_free(buf)
 }

@@ -19,9 +19,7 @@
 
 ### 南向依赖
 
-| 依赖 | 类型 |
-|------|------|
-| `platform` | external |
+（无）
 
 ### 数据契约
 
@@ -48,7 +46,6 @@
 | 依赖 | 类型 |
 |------|------|
 | `i2c` | internal |
-| `sensor` | external |
 
 ### 数据契约
 
@@ -82,7 +79,6 @@ typedef struct {
 | 依赖 | 类型 |
 |------|------|
 | `i2c` | internal |
-| `sensor` | external |
 
 ### 数据契约
 

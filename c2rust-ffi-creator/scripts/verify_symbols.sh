@@ -55,8 +55,8 @@ if [[ ! -f "${EXPECTED_FILE}" ]]; then
         exit 1
     fi
 
-    # 从 spec.json 读取构建命令
-    C_BUILD_CMD=$(python3 -c "import json,sys; d=json.load(open('${SPEC_JSON}')); print(d['project']['build_command'])")
+    # 从 spec.json 读取构建命令（将路径作为参数传给 Python，避免路径中特殊字符注入）
+    C_BUILD_CMD=$(python3 -c "import json, sys; d = json.load(open(sys.argv[1])); print(d['project']['build_command'])" "${SPEC_JSON}")
     echo "  C 构建命令：${C_BUILD_CMD}"
 
     # 在 C 目录内执行构建（保留原目录结构，构建可正常工作）
@@ -66,13 +66,13 @@ if [[ ! -f "${EXPECTED_FILE}" ]]; then
     eval "${C_BUILD_CMD}"
     popd > /dev/null
 
-    # 优先从 spec.json output_artifacts 字段获取预期产物路径
+    # 优先从 spec.json output_artifacts 字段获取预期产物路径（将路径作为参数传给 Python）
     ARTIFACTS_JSON=$(python3 -c "
 import json, sys
-d = json.load(open('${SPEC_JSON}'))
+d = json.load(open(sys.argv[1]))
 arts = d.get('project', {}).get('output_artifacts', [])
 print('\n'.join(arts))
-" 2>/dev/null || true)
+" "${SPEC_JSON}" 2>/dev/null || true)
 
     C_LIB_SO=""
     C_LIB_A=""

@@ -26,10 +26,10 @@ description: 此技能应在用户需要将 C 项目迁移为 Rust FFI 封装层
    │   └── c/              # 存放原 C 项目完整目录树及分析产物
    ├── ffi/                # Rust FFI 封装 crate
    │   ├── Cargo.toml
-   │   └── src/
+   │   ├── src/
+   │   │   └── lib.rs
+   │   └── tests/          # 集成测试（位于 ffi crate 内）
    │       └── lib.rs
-   └── tests/              # 集成测试
-       └── lib.rs
    ```
 3. 在 `Cargo.toml` 中加入 `hicc` 依赖（见 `references/hicc-guide.md` §配置）。
 

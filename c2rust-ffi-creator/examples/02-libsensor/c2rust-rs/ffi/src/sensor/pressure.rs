@@ -33,24 +33,18 @@ mod sys {
 
 /// # Safety
 /// 调用方须确保所有指针参数有效且生命周期覆盖本次调用。
-/// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
-#[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn pressure_sensor_init(addr: u8) -> c_int {
     sys::__c_pressure_sensor_init(addr)
 }
 
 /// # Safety
 /// 调用方须确保所有指针参数有效且生命周期覆盖本次调用。
-/// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
-#[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn pressure_sensor_read(addr: u8, out: *mut PressureReadingT) -> c_int {
     sys::__c_pressure_sensor_read(addr, out)
 }
 
 /// # Safety
 /// 调用方须确保所有指针参数有效且生命周期覆盖本次调用。
-/// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。
-#[cfg_attr(not(test), no_mangle)]
 pub unsafe extern "C" fn pressure_sensor_shutdown(addr: u8) {
     sys::__c_pressure_sensor_shutdown(addr)
 }

@@ -16,12 +16,9 @@
     "build_system": "make|cmake|autoconf",
     "build_command": "string",   // 完整构建命令，例如 "make all"
     "test_command": "string",    // 完整测试命令，例如 "make test"
-    "output_artifacts": [        // 构建产物列表
-      {
-        "type": "staticlib|sharedlib|executable",
-        "name": "string",        // 例如 "libfoo.a"
-        "exported_symbols": []   // 由 verify_symbols.sh 填充
-      }
+    "output_artifacts": [        // 构建产物路径列表（相对于 .c2rust/c/，由 verify_symbols.sh 读取）
+      "libfoo.a",               // 例如静态库
+      "libfoo.so"               // 例如动态库（可省略，脚本会自动扫描回退）
     ]
   },
   "modules": [

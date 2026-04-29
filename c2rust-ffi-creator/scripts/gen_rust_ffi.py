@@ -201,7 +201,8 @@ def gen_module_rs(mod_name: str, interfaces: list, timestamp: str, original_head
         lines.append(f"        pub(super) fn __c_{func}({params_str}) -> {ret};")
     lines += ["    }", "}", ""]
 
-    # 公开封装函数（#[no_mangle] + pub extern "C"），通过 sys::__c_ 调用原始 C 函数
+    # 公开封装函数（pub extern "C"），通过 sys::__c_ 调用原始 C 函数。
+    # C 对象（由 build.rs 经 hicc-build 编译）直接导出同名符号，此处不加 #[no_mangle] 避免符号重复定义。
     for iface in interfaces:
         func = iface["function"]
         params_str = _build_rust_params(iface.get("params", []))
@@ -214,8 +215,6 @@ def gen_module_rs(mod_name: str, interfaces: list, timestamp: str, original_head
         lines += [
             "/// # Safety",
             f"/// 调用方须确保所有指针参数有效且生命周期覆盖本次调用。",
-            "/// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。",
-            "#[cfg_attr(not(test), no_mangle)]",
             f"pub unsafe extern \"C\" fn {func}({params_str}) -> {ret} {{",
             f"    sys::__c_{func}({params_call})",
             "}",
