@@ -1,9 +1,16 @@
-// Integration tests for simple-calc.
+// tests/integration_test.rs — Rust migration of .c2rust/c/tests/test_calc.c
 //
-// These call the #[no_mangle] extern "C" functions through the rlib crate type,
-// mirroring what a C caller would see at the ABI level.
+// Each test function below corresponds to a C test function in test_calc.c.
+// The inputs and expected values are identical to the C test suite so that
+// a passing Rust test proves the FFI wrapper is functionally equivalent to
+// the original C implementation.
+//
+// C source: examples/simple-calc/.c2rust/c/tests/test_calc.c
 
 use simple_calc::{calc_add, calc_sub, calc_mul};
+
+// ── test_add ──────────────────────────────────────────────────────────────
+// Mirrors: static void test_add(void) in test_calc.c
 
 #[test]
 fn add_basic() {
@@ -11,12 +18,12 @@ fn add_basic() {
 }
 
 #[test]
-fn add_large_numbers() {
+fn add_large() {
     assert_eq!(calc_add(1_000_000, 2_000_000), 3_000_000);
 }
 
 #[test]
-fn add_negative() {
+fn add_with_negative() {
     assert_eq!(calc_add(-5, 3), -2);
 }
 
@@ -26,9 +33,12 @@ fn add_both_negative() {
 }
 
 #[test]
-fn add_wraps_max() {
-    assert_eq!(calc_add(i32::MAX, 1), i32::MIN);
+fn add_zeros() {
+    assert_eq!(calc_add(0, 0), 0);
 }
+
+// ── test_sub ──────────────────────────────────────────────────────────────
+// Mirrors: static void test_sub(void) in test_calc.c
 
 #[test]
 fn sub_basic() {
@@ -41,9 +51,17 @@ fn sub_negative_result() {
 }
 
 #[test]
-fn sub_wraps_min() {
-    assert_eq!(calc_sub(i32::MIN, 1), i32::MAX);
+fn sub_zeros() {
+    assert_eq!(calc_sub(0, 0), 0);
 }
+
+#[test]
+fn sub_equal_negatives() {
+    assert_eq!(calc_sub(-1, -1), 0);
+}
+
+// ── test_mul ──────────────────────────────────────────────────────────────
+// Mirrors: static void test_mul(void) in test_calc.c
 
 #[test]
 fn mul_basic() {

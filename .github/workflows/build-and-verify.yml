@@ -43,11 +43,23 @@ jobs:
       #   Pattern — pure Rust ABI replacement; no C compiled into Rust.
       # ════════════════════════════════════════════════════════════════════
 
+      - name: "[simple-calc] Build C library and test binary"
+        working-directory: examples/simple-calc
+        run: |
+          cmake -B .c2rust/c/_build -S .c2rust/c \
+            -DCMAKE_BUILD_TYPE=Release \
+            -Wno-dev
+          cmake --build .c2rust/c/_build
+
+      - name: "[simple-calc] Run C tests"
+        working-directory: examples/simple-calc
+        run: .c2rust/c/_build/test_calc
+
       - name: "[simple-calc] Build Rust"
         working-directory: examples/simple-calc
         run: cargo build --release
 
-      - name: "[simple-calc] Test Rust"
+      - name: "[simple-calc] Test Rust (mirrors C test suite)"
         working-directory: examples/simple-calc
         run: cargo test
 
@@ -92,7 +104,7 @@ jobs:
         working-directory: examples/complex-kv-store
         run: cargo build --release
 
-      - name: "[complex-kv-store] Test Rust"
+      - name: "[complex-kv-store] Test Rust (mirrors C test suite)"
         working-directory: examples/complex-kv-store
         run: cargo test
 

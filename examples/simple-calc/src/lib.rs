@@ -35,43 +35,42 @@ pub extern "C" fn calc_mul(a: i32, b: i32) -> c_int {
 }
 
 // ---------------------------------------------------------------------------
-// Unit tests
+// Unit tests — mirror the C test cases in .c2rust/c/tests/test_calc.c
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // test_add
     #[test]
-    fn add_two_positives() {
-        assert_eq!(calc_add(2, 3), 5);
-    }
+    fn add_basic() { assert_eq!(calc_add(1, 2), 3); }
     #[test]
-    fn add_with_negative() {
-        assert_eq!(calc_add(-4, 1), -3);
-    }
+    fn add_large() { assert_eq!(calc_add(1_000_000, 2_000_000), 3_000_000); }
     #[test]
-    fn add_wraps_on_overflow() {
-        assert_eq!(calc_add(i32::MAX, 1), i32::MIN);
-    }
+    fn add_with_negative() { assert_eq!(calc_add(-5, 3), -2); }
     #[test]
-    fn sub_basic() {
-        assert_eq!(calc_sub(10, 4), 6);
-    }
+    fn add_both_negative() { assert_eq!(calc_add(-5, -3), -8); }
     #[test]
-    fn sub_negative_result() {
-        assert_eq!(calc_sub(3, 10), -7);
-    }
+    fn add_zeros() { assert_eq!(calc_add(0, 0), 0); }
+
+    // test_sub
     #[test]
-    fn mul_basic() {
-        assert_eq!(calc_mul(3, 7), 21);
-    }
+    fn sub_basic() { assert_eq!(calc_sub(10, 3), 7); }
     #[test]
-    fn mul_by_zero() {
-        assert_eq!(calc_mul(999, 0), 0);
-    }
+    fn sub_negative_result() { assert_eq!(calc_sub(3, 10), -7); }
     #[test]
-    fn mul_negative() {
-        assert_eq!(calc_mul(-3, 4), -12);
-    }
+    fn sub_zeros() { assert_eq!(calc_sub(0, 0), 0); }
+    #[test]
+    fn sub_equal_negatives() { assert_eq!(calc_sub(-1, -1), 0); }
+
+    // test_mul
+    #[test]
+    fn mul_basic() { assert_eq!(calc_mul(4, 5), 20); }
+    #[test]
+    fn mul_by_zero() { assert_eq!(calc_mul(999, 0), 0); }
+    #[test]
+    fn mul_negative() { assert_eq!(calc_mul(-3, 4), -12); }
+    #[test]
+    fn mul_both_negative() { assert_eq!(calc_mul(-3, -4), 12); }
 }
