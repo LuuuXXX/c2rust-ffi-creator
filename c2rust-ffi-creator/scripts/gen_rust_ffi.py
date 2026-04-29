@@ -123,6 +123,33 @@ def map_c_type(c_type: str) -> str:
     return rust_base
 
 
+def _is_placeholder_type(c_type: str) -> tuple:
+    """
+    如果 c_type 映射到一个占位名（未知 C 类型），返回 (True, placeholder_name)，
+    否则返回 (False, "")。
+    """
+    base = c_type.replace("const", "").replace("*", "").strip()
+    base = re.sub(r'\s+', ' ', base)
+    if not base or C_TO_RUST.get(base) is not None:
+        return False, ""
+    name = "".join(w.capitalize() for w in re.split(r'[\s_]+', base))
+    return (True, name) if name else (False, "")
+
+
+def _collect_placeholder_types(interfaces: list) -> list:
+    """从接口列表中收集所有占位 PascalCase 类型名（去重有序）。"""
+    seen = {}
+    for iface in interfaces:
+        for p in iface.get("params", []):
+            ok, name = _is_placeholder_type(p.get("type", ""))
+            if ok and name not in seen:
+                seen[name] = True
+        ok, name = _is_placeholder_type(iface.get("return_type", ""))
+        if ok and name not in seen:
+            seen[name] = True
+    return list(seen.keys())
+
+
 def gen_module_rs(mod_name: str, interfaces: list, timestamp: str, original_header: str = "") -> str:
     """为一个 C 模块生成对应的 Rust FFI 模块文件内容。"""
     header_comment = f"//! 原 C 头文件：{original_header}" if original_header else f"//! 原 C 模块：{mod_name}"
@@ -132,7 +159,7 @@ def gen_module_rs(mod_name: str, interfaces: list, timestamp: str, original_head
         f"//! 生成时间：{timestamp}",
         f"//! 警告：此文件由 gen_rust_ffi.py 自动生成，请在人工审核后修改。",
         "",
-        "#![allow(non_camel_case_types, non_snake_case, dead_code)]",
+        "#![allow(non_camel_case_types, non_snake_case, dead_code, unused_imports)]",
         "",
         "use std::ffi::{c_int, c_uint, c_long, c_char, c_void, c_float, c_double};",
         "",
@@ -145,17 +172,32 @@ def gen_module_rs(mod_name: str, interfaces: list, timestamp: str, original_head
         ]
         return "\n".join(lines)
 
-    # extern "C" 块（声明原始 C 函数）
+    # 占位类型：为未知 C struct/typedef 生成不透明 Rust 结构体
+    placeholders = _collect_placeholder_types(interfaces)
+    for ph in placeholders:
+        lines += [
+            f"/// 不透明 C 类型占位符，人工审核时请替换为真实的 `#[repr(C)]` 定义。",
+            f"#[repr(C)]",
+            f"pub struct {ph} {{",
+            f"    _opaque: [u8; 0],",
+            f"}}",
+            "",
+        ]
+
+    # extern "C" 块（包裹在 mod sys 中，避免与公开封装函数同名冲突）
     lines += [
-        "extern \"C\" {",
+        "mod sys {",
+        "    #[allow(unused_imports)]",
+        "    use super::*;",
+        "    extern \"C\" {",
     ]
     for iface in interfaces:
         params_str = _build_rust_params(iface.get("params", []))
         ret = map_c_type(iface.get("return_type", "int"))
-        lines.append(f"    fn {iface['function']}({params_str}) -> {ret};")
-    lines += ["}", ""]
+        lines.append(f"        pub(super) fn {iface['function']}({params_str}) -> {ret};")
+    lines += ["    }", "}", ""]
 
-    # 公开封装函数（#[no_mangle] + pub extern "C"）
+    # 公开封装函数（#[no_mangle] + pub extern "C"），通过 sys:: 调用原始 C 函数
     for iface in interfaces:
         func = iface["function"]
         params_str = _build_rust_params(iface.get("params", []))
@@ -168,9 +210,10 @@ def gen_module_rs(mod_name: str, interfaces: list, timestamp: str, original_head
         lines += [
             "/// # Safety",
             f"/// 调用方须确保所有指针参数有效且生命周期覆盖本次调用。",
-            "#[no_mangle]",
+            "/// 注意：`#[no_mangle]` 仅在非测试模式下生效，以避免链接时符号冲突。",
+            "#[cfg_attr(not(test), no_mangle)]",
             f"pub unsafe extern \"C\" fn {func}({params_str}) -> {ret} {{",
-            f"    {func}({params_call})",
+            f"    sys::{func}({params_call})",
             "}",
             "",
         ]

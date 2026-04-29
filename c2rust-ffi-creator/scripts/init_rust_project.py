@@ -61,15 +61,28 @@ FFI_LIB_RS = """\
 """
 
 BUILD_RS = """\
-// build.rs — 按需启用以编译 C 源码
+// build.rs — 按需启用以在 Rust crate 中编译 C 源码
 //
+// 启用步骤：
+//   1. 在 ffi/Cargo.toml 的 [build-dependencies] 中添加：
+//          cc = "1"
+//   2. 将下方占位路径替换为 spec.json sources[] 中的实际路径
+//      （禁止假设 src/ / include/ 等固定层级；路径须与原 C 项目目录树一致）
+//   3. 删除外层 /* ... */ 注释，使代码生效
+//
+// /*
 // fn main() {
-//     // 路径应与原 C 项目实际目录结构一致（禁止假设 src/ / include/ 等固定层级）
-//     hicc_build::Build::new()
-//         .file("../.c2rust/c/<path/to/foo.c>")   // 实际路径以 spec.json sources[] 为准
+//     cc::Build::new()
+//         .file("../.c2rust/c/<path/to/foo.c>")   // 替换为实际源文件路径
 //         .include("../.c2rust/c/<path/to/includes>")
 //         .compile("c2rust_c_core");
 // }
+// */
+
+fn main() {
+    // 占位实现：当前不编译任何 C 源码。
+    // 启用 C 编译时请按上方注释操作，并将此空 main 替换为实际编译逻辑。
+}
 """
 
 FFI_TEST_RS = """\

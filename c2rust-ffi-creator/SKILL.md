@@ -84,12 +84,19 @@ description: 此技能应在用户需要将 C 项目迁移为 Rust FFI 封装层
 
    - `lib.rs`：仅声明顶层模块（不会因模块增多而爆炸）
    - `<group>/mod.rs`：声明该目录下的子模块
-   - `<leaf>.rs`：具体 FFI 函数（`#[no_mangle]` + `pub unsafe extern "C"`）
+   - `<leaf>.rs`：具体 FFI 函数（`#[cfg_attr(not(test), no_mangle)]` + `pub unsafe extern "C"`）
 
-2. 按照 `references/hicc-guide.md` 中的规范编写每个 FFI 函数的 Rust 实现：
-   - 使用 `hicc::bridge` 宏（或手动 `extern "C"` 块）包装 C 函数。
+   > **链接模型说明**：`#[no_mangle]` 仅在非测试构建中生效，以避免 `cargo test` 时链接器将
+   > `extern "C"` 引用解析到 Rust 包装函数本身（而非 C 实现）导致的递归。测试构建中
+   > 包装函数以普通 Rust 名称存在，`extern "C"` 块引用顺利解析到 C 静态库。
+
+2. **人工审核生成的 Rust 文件**，重点检查：
+   - 将自动生成的不透明占位结构体（`pub struct FooT { _opaque: [u8; 0] }`）替换为与 C 端
+     内存布局完全一致的 `#[repr(C)]` 定义（参考 `spec.json` 中 `data_contracts` 字段）。
+   - 在 `ffi/Cargo.toml` 的 `[build-dependencies]` 中添加 `cc = "1"`。
+   - 在 `ffi/build.rs` 中启用 C 编译（按模板注释操作，路径与 `spec.json sources[]` 一致）。
    - 所有裸指针操作须包裹在 `unsafe` 块中，并添加安全注释。
-   - 结构体映射使用 `#[repr(C)]`。
+
 3. 确认 `ffi/Cargo.toml` 中 `crate-type = ["cdylib", "staticlib"]`。
 
 ---

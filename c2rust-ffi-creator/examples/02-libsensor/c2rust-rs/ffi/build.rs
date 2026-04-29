@@ -1,9 +1,13 @@
-// build.rs — 按需启用以编译 C 源码
+// build.rs — 将 C 源码编译为静态库并链接到 Rust FFI crate
 //
-// fn main() {
-//     // 路径应与原 C 项目实际目录结构一致（禁止假设 src/ / include/ 等固定层级）
-//     hicc_build::Build::new()
-//         .file("../.c2rust/c/<path/to/foo.c>")   // 实际路径以 spec.json sources[] 为准
-//         .include("../.c2rust/c/<path/to/includes>")
-//         .compile("c2rust_c_core");
-// }
+// 路径相对于此 build.rs 所在目录（ffi/），
+// 与 spec.json sources[] 字段中的路径保持一致。
+
+fn main() {
+    cc::Build::new()
+        .file("../.c2rust/c/src/platform/linux/i2c.c")
+        .file("../.c2rust/c/src/sensor/pressure.c")
+        .file("../.c2rust/c/src/sensor/temperature.c")
+        .include("../.c2rust/c/include")
+        .compile("sensor");
+}

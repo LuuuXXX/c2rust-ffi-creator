@@ -11,5 +11,5 @@ crate-type = ["cdylib", "staticlib"]
 hicc = { workspace = true }
 libc = { workspace = true }
 
-# [build-dependencies]
-# hicc-build = "0.2"  # 取消注释以在 build.rs 中编译 C 代码
+[build-dependencies]
+cc = "1"
