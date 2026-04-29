@@ -60,13 +60,55 @@ if [[ ! -f "${EXPECTED_FILE}" ]]; then
     echo "  C 构建命令：${C_BUILD_CMD}"
 
     # 在 C 目录内执行构建（保留原目录结构，构建可正常工作）
+    # ⚠️  安全提示：build_command 取自 spec.json；请确保该文件来自受信任的仓库。
+    #    如有需要可用 JSON 数组格式存储构建命令并用 "${CMD[@]}" 调用，以避免 shell 注入风险。
     pushd "${C_DIR}" > /dev/null
     eval "${C_BUILD_CMD}"
     popd > /dev/null
 
-    # 查找 C 构建产物（.so / .a / .dylib）
-    C_LIB_SO=$(find "${C_DIR}" -name "*.so" -o -name "*.dylib" 2>/dev/null | head -1 || true)
-    C_LIB_A=$(find "${C_DIR}" -name "*.a" 2>/dev/null | grep -v "CMakeFiles" | head -1 || true)
+    # 优先从 spec.json output_artifacts 字段获取预期产物路径
+    ARTIFACTS_JSON=$(python3 -c "
+import json, sys
+d = json.load(open('${SPEC_JSON}'))
+arts = d.get('project', {}).get('output_artifacts', [])
+print('\n'.join(arts))
+" 2>/dev/null || true)
+
+    C_LIB_SO=""
+    C_LIB_A=""
+    if [[ -n "${ARTIFACTS_JSON}" ]]; then
+        while IFS= read -r art; do
+            [[ -z "${art}" ]] && continue
+            art_path="${C_DIR}/${art}"
+            if [[ "${art_path}" == *.so || "${art_path}" == *.dylib ]]; then
+                C_LIB_SO="${art_path}"
+            elif [[ "${art_path}" == *.a ]]; then
+                C_LIB_A="${art_path}"
+            fi
+        done <<< "${ARTIFACTS_JSON}"
+    fi
+
+    # 回退：在构建目录扫描，如果有多个候选则报错
+    if [[ -z "${C_LIB_SO}" && -z "${C_LIB_A}" ]]; then
+        mapfile -t SO_CANDIDATES < <(find "${C_DIR}" \( -name "*.so" -o -name "*.dylib" \) 2>/dev/null | grep -v CMakeFiles || true)
+        mapfile -t A_CANDIDATES  < <(find "${C_DIR}" -name "*.a" 2>/dev/null | grep -v CMakeFiles || true)
+        if [[ ${#SO_CANDIDATES[@]} -eq 1 ]]; then
+            C_LIB_SO="${SO_CANDIDATES[0]}"
+        elif [[ ${#SO_CANDIDATES[@]} -gt 1 ]]; then
+            echo "✗ 错误：在 ${C_DIR} 下发现多个动态库产物，请在 spec.json 的 output_artifacts 字段明确指定：" >&2
+            printf '    %s\n' "${SO_CANDIDATES[@]}" >&2
+            exit 1
+        fi
+        if [[ -z "${C_LIB_SO}" ]]; then
+            if [[ ${#A_CANDIDATES[@]} -eq 1 ]]; then
+                C_LIB_A="${A_CANDIDATES[0]}"
+            elif [[ ${#A_CANDIDATES[@]} -gt 1 ]]; then
+                echo "✗ 错误：在 ${C_DIR} 下发现多个静态库产物，请在 spec.json 的 output_artifacts 字段明确指定：" >&2
+                printf '    %s\n' "${A_CANDIDATES[@]}" >&2
+                exit 1
+            fi
+        fi
+    fi
 
     if [[ -n "${C_LIB_SO}" ]]; then
         echo "  使用 C 动态库：${C_LIB_SO}"

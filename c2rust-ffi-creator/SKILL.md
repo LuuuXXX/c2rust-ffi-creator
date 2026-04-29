@@ -104,7 +104,7 @@ description: 此技能应在用户需要将 C 项目迁移为 Rust FFI 封装层
 ### 阶段五：转换 C 测试为 Rust 测试
 
 1. 根据 `spec.json` 中 `test_files` 字段定位原 C 测试文件（路径相对于 `.c2rust/c/`）。
-2. 对照每个 C 测试文件，在 `c2rust-rs/tests/` 下生成对应的 Rust 测试文件，文件名与原 C 测试文件保持一致（将 `.c` 替换为 `.rs`）。
+2. 对照每个 C 测试文件，在 `c2rust-rs/ffi/tests/` 下生成对应的 Rust 测试文件，文件名与原 C 测试文件保持一致（将 `.c` 替换为 `.rs`）。
 3. 遵循转换规则（详见 `references/test-conversion.md`）：
    - `assert(expr)` → `assert!(expr)`
    - `assert_eq(a, b)` → `assert_eq!(a, b)`

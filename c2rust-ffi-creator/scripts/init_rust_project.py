@@ -116,7 +116,7 @@ def create_project(output_dir: str):
         root,
         root / ".c2rust" / "c",   # 仅创建空目录；原 C 项目将以 cp -r 保留结构复制进来
         root / "ffi" / "src",
-        root / "tests",
+        root / "ffi" / "tests",
     ]
     for d in dirs:
         d.mkdir(parents=True, exist_ok=True)
@@ -128,7 +128,7 @@ def create_project(output_dir: str):
         root / "ffi" / "Cargo.toml": FFI_CARGO_TOML,
         root / "ffi" / "src" / "lib.rs": FFI_LIB_RS,
         root / "ffi" / "build.rs": BUILD_RS,
-        root / "tests" / "lib.rs": FFI_TEST_RS,
+        root / "ffi" / "tests" / "lib.rs": FFI_TEST_RS,
     }
     for path, content in files.items():
         path.write_text(content)

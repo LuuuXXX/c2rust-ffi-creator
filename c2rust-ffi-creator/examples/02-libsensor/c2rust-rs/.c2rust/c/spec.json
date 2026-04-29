@@ -102,12 +102,7 @@
           "description": ""
         }
       ],
-      "south_deps": [
-        {
-          "module": "platform",
-          "type": "external"
-        }
-      ],
+      "south_deps": [],
       "data_contracts": [],
       "test_coverage": []
     },
@@ -167,10 +162,6 @@
         {
           "module": "i2c",
           "type": "internal"
-        },
-        {
-          "module": "sensor",
-          "type": "external"
         }
       ],
       "data_contracts": [
@@ -240,10 +231,6 @@
         {
           "module": "i2c",
           "type": "internal"
-        },
-        {
-          "module": "sensor",
-          "type": "external"
         }
       ],
       "data_contracts": [

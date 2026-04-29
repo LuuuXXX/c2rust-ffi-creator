@@ -10,9 +10,9 @@
 
 | C 测试文件 | Rust 测试文件 |
 |-----------|--------------|
-| `test_foo.c` | `tests/test_foo.rs` |
-| `foo_test.c` | `tests/foo_test.rs` |
-| `check_bar.c` | `tests/check_bar.rs` |
+| `test_foo.c` | `ffi/tests/test_foo.rs` |
+| `foo_test.c` | `ffi/tests/foo_test.rs` |
+| `check_bar.c` | `ffi/tests/check_bar.rs` |
 
 ---
 
@@ -156,7 +156,7 @@ fn test_something() {
 //! 转换时间：<timestamp>
 
 use std::ffi::{CStr, CString, c_int};
-use c2rust_ffi::foo::{FooCtx, foo_init, foo_destroy};
+use ffi::foo::{FooCtx, foo_init, foo_destroy};
 
 // ... 测试函数 ...
 ```
