@@ -1,0 +1,21 @@
+[package]
+name = "c2rust-rs"
+version = "1.0.0"
+edition = "2021"
+description = "Rust FFI wrapper for the calc C library (r2rust-ffi-creator demo)"
+license = "MIT"
+
+# Generate both dynamic and static libraries to match C version outputs
+# rlib is also included for integration tests and Rust callers
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+libc = "0.2"
+
+[build-dependencies]
+bindgen = "0.69"
+cc = "1.0"
+
+[dev-dependencies]
+# No extra test dependencies needed

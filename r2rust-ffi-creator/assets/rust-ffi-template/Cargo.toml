@@ -1,0 +1,19 @@
+[package]
+name = "c2rust-rs"
+version = "0.1.0"
+edition = "2021"
+
+# 同时生成动态库和静态库，与 C 版本产物对应
+# rlib 用于集成测试和 Rust 代码调用
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+libc = "0.2"
+
+[build-dependencies]
+bindgen = "0.69"
+cc = "1.0"
+
+[dev-dependencies]
+# 用于集成测试中的断言辅助

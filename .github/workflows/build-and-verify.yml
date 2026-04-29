@@ -1,0 +1,111 @@
+name: Build & Verify (C + Rust FFI)
+
+on:
+  push:
+    branches: [ main, "copilot/**" ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-verify:
+    name: Build C + Rust, verify symbol consistency
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install C build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake gcc libm-dev libclang-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            c2rust-rs/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('c2rust-rs/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      # ── Build C version ──────────────────────────────────────────────────
+      - name: Build C library
+        working-directory: c2rust-rs
+        run: |
+          cmake -B .c2rust/c/_build -S .c2rust/c \
+            -DCMAKE_BUILD_TYPE=Release \
+            -Wno-dev
+          cmake --build .c2rust/c/_build
+
+      # ── Run C tests ──────────────────────────────────────────────────────
+      - name: Run C tests
+        working-directory: c2rust-rs
+        run: |
+          .c2rust/c/_build/test_calc
+
+      # ── Extract C symbols ────────────────────────────────────────────────
+      - name: Extract C exported symbols
+        working-directory: c2rust-rs
+        run: |
+          C_LIB=$(find .c2rust/c/_build -name "libcalc.so" | head -1)
+          echo "C library: $C_LIB"
+          nm -g --defined-only "$C_LIB" \
+            | grep " T \| W " \
+            | awk '{print $3}' \
+            | grep -v "^_" \
+            | sort \
+            > .c2rust/c/symbols_c.txt
+          echo "C exported symbols:"
+          cat .c2rust/c/symbols_c.txt
+
+      # ── Build Rust version ───────────────────────────────────────────────
+      - name: Build Rust FFI library
+        working-directory: c2rust-rs
+        run: cargo build --release
+
+      # ── Run Rust tests ───────────────────────────────────────────────────
+      - name: Run Rust tests
+        working-directory: c2rust-rs
+        run: cargo test
+
+      # ── Verify symbol consistency ─────────────────────────────────────────
+      - name: Verify exported symbol consistency
+        working-directory: c2rust-rs
+        run: |
+          RUST_LIB=$(find target/release -maxdepth 1 -name "libc2rust_rs.so" -o -name "libc2rust_rs.dylib" 2>/dev/null | head -1)
+          echo "Rust library: $RUST_LIB"
+
+          nm -g --defined-only "$RUST_LIB" \
+            | grep " T \| W " \
+            | awk '{print $3}' \
+            | grep -v "^_" \
+            | sort \
+            > .c2rust/symbols_rust.txt
+
+          echo "Rust exported symbols:"
+          cat .c2rust/symbols_rust.txt
+
+          echo ""
+          echo "Symbol comparison (C vs Rust):"
+          MISSING=$(comm -23 .c2rust/c/symbols_c.txt .c2rust/symbols_rust.txt || true)
+          if [[ -n "$MISSING" ]]; then
+            echo "FAIL: The following C symbols are missing from the Rust library:"
+            echo "$MISSING"
+            exit 1
+          else
+            echo "PASS: All C exported symbols are present in the Rust library"
+          fi
+
+      # ── Validate skill structure ─────────────────────────────────────────
+      - name: Validate r2rust-ffi-creator skill
+        run: |
+          python3 skill-creator-cn/quick_validate.py r2rust-ffi-creator
