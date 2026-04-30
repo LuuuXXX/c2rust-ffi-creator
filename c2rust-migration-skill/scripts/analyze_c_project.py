@@ -203,6 +203,19 @@ C_GLOBAL_VAR_RE = re.compile(
     re.MULTILINE,
 )
 
+# C keywords that must not be mistaken for global variable names
+_C_KEYWORDS: frozenset[str] = frozenset({
+    "return", "if", "else", "for", "while", "do",
+    "switch", "case", "break", "continue",
+})
+
+# Common libc / runtime function names to exclude from callee maps
+_COMMON_LIBC_FUNCS: frozenset[str] = frozenset({
+    "if", "while", "for", "switch", "return", "sizeof",
+    "typeof", "assert", "printf", "fprintf", "malloc", "free",
+    "memset", "memcpy", "strlen", "strcpy", "strcat", "sprintf",
+})
+
 
 def analyze_source_file(src: Path) -> dict[str, Any]:
     """Extract function definitions, calls, and global variables from a .c file."""
@@ -225,8 +238,7 @@ def analyze_source_file(src: Path) -> dict[str, Any]:
     top = "\n".join(text.splitlines()[:80])
     for m in C_GLOBAL_VAR_RE.finditer(top):
         name = m.group(1)
-        if name not in ("return", "if", "else", "for", "while", "do",
-                         "switch", "case", "break", "continue"):
+        if name not in _C_KEYWORDS:
             result["global_vars"].append(name)
 
     return result
@@ -272,11 +284,7 @@ def build_callee_map(src: Path,
         callees = set()
         for m in C_FUNC_CALL_RE.finditer(body):
             called = m.group(1)
-            if called != fname and called not in (
-                "if", "while", "for", "switch", "return", "sizeof",
-                "typeof", "assert", "printf", "fprintf", "malloc", "free",
-                "memset", "memcpy", "strlen", "strcpy", "strcat", "sprintf",
-            ):
+            if called != fname and called not in _COMMON_LIBC_FUNCS:
                 callees.add(called)
         callee_map[fname] = sorted(callees)
 
