@@ -187,6 +187,100 @@ fi
 echo "OK: 递归扫描验证通过（bar_add 已提取）"
 
 # ──────────────────────────────────────────────────────────────────
+# 测试 5：analyze_c_project.py — Step 0 基本功能
+# ──────────────────────────────────────────────────────────────────
+echo ""
+echo "--- 测试 5：analyze_c_project.py（Step 0 C 项目分析）---"
+
+# 构造一个最小 C 项目骨架（含 CMakeLists.txt、.c、.h、测试文件）
+mkdir -p "$TMP_DIR/c_proj/include" "$TMP_DIR/c_proj/src" "$TMP_DIR/c_proj/tests"
+
+cat > "$TMP_DIR/c_proj/CMakeLists.txt" << 'CEOF'
+cmake_minimum_required(VERSION 3.10)
+project(sample C)
+add_library(sample SHARED src/sample.c)
+target_include_directories(sample PUBLIC include)
+CEOF
+
+cat > "$TMP_DIR/c_proj/include/sample.h" << 'CEOF'
+#ifndef SAMPLE_H
+#define SAMPLE_H
+int sample_init(void);
+void sample_destroy(void);
+int sample_compute(int x, int y);
+#endif
+CEOF
+
+cat > "$TMP_DIR/c_proj/src/sample.c" << 'CEOF'
+#include "sample.h"
+#include <stdlib.h>
+static int g_initialized = 0;
+static int internal_add(int a, int b) { return a + b; }
+int sample_init(void) { g_initialized = 1; return 0; }
+void sample_destroy(void) { g_initialized = 0; }
+int sample_compute(int x, int y) { return internal_add(x, y); }
+CEOF
+
+cat > "$TMP_DIR/c_proj/tests/test_sample.c" << 'CEOF'
+#include "sample.h"
+void test_sample_init(void) { sample_init(); sample_destroy(); }
+void test_sample_compute(void) { sample_compute(1, 2); }
+CEOF
+
+ANALYSIS_OUT="$TMP_DIR/c-project-analysis.md"
+
+"$PYTHON" "$SCRIPT_DIR/analyze_c_project.py" \
+    "$TMP_DIR/c_proj" \
+    --headers "$TMP_DIR/c_proj/include" \
+    --output "$ANALYSIS_OUT"
+
+if [ ! -s "$ANALYSIS_OUT" ]; then
+    echo "FAIL: c-project-analysis.md 为空或不存在"
+    exit 1
+fi
+echo "OK: c-project-analysis.md 已生成（$(wc -l < "$ANALYSIS_OUT") 行）"
+
+# 验证报告包含所有必须章节和关键内容
+for keyword in \
+    "构建系统分析" \
+    "项目文件清单" \
+    "北向接口声明" \
+    "现有测试覆盖映射" \
+    "北向函数实现依赖分析" \
+    "人工确认点 0" \
+    "CMake" \
+    "sample_init" \
+    "sample_compute" \
+    "test_sample"; do
+    if ! grep -q "$keyword" "$ANALYSIS_OUT"; then
+        echo "FAIL: c-project-analysis.md 中缺少关键词 '$keyword'"
+        exit 1
+    fi
+done
+echo "OK: 关键章节和函数均已检测到"
+
+# 验证测试文件识别正确
+if ! grep -q "test_sample" "$ANALYSIS_OUT"; then
+    echo "FAIL: 未识别到测试文件 test_sample.c"
+    exit 1
+fi
+echo "OK: 测试文件识别通过"
+
+# 验证 analyze_c_project.py 拒绝不存在的目录
+if "$PYTHON" "$SCRIPT_DIR/analyze_c_project.py" /nonexistent_dir_xyz 2>/dev/null; then
+    echo "FAIL: 对不存在目录应返回非零退出码"
+    exit 1
+fi
+echo "OK: 不存在目录错误处理通过"
+
+# 验证 analyze_c_project.py 拒绝文件路径作为 project_root
+if "$PYTHON" "$SCRIPT_DIR/analyze_c_project.py" "$TMP_DIR/c_proj/include/sample.h" 2>/dev/null; then
+    echo "FAIL: 对文件路径作为 project_root 应返回非零退出码"
+    exit 1
+fi
+echo "OK: 文件路径作为 project_root 的错误处理通过"
+
+# ──────────────────────────────────────────────────────────────────
 # 全部通过
 # ──────────────────────────────────────────────────────────────────
 echo ""

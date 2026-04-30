@@ -410,6 +410,27 @@ def _parse_headers_regex(header_files: list[Path]) -> dict[str, Any]:
                     "modifies_global": False,
                     "notes": "",
                 },
+                "implementation_analysis": {
+                    "source_file": "TODO: 实现此函数的 .c 文件路径（来自 c-project-analysis.md 第6节）",
+                    "internal_callees": [
+                        {
+                            "name": "TODO: 被调用的内部函数名",
+                            "source_file": "TODO: 所在 .c 文件",
+                            "purpose": "TODO: 作用说明",
+                        }
+                    ],
+                    "global_state_deps": [
+                        {
+                            "name": "TODO: 全局变量名",
+                            "c_type": "TODO: C 类型",
+                            "access": "read",
+                            "thread_safety_notes": "TODO: 默认按 read 填充；需人工确认实际访问方式是否为 write/read_write，并补充线程安全影响",
+                        }
+                    ],
+                    "logic_summary": ["TODO: 实现逻辑步骤 1", "TODO: 步骤 2"],
+                    "conditional_compilation": [],
+                    "notes": "",
+                },
                 "risk_signals": risks,
                 "notes": "",
             })
@@ -517,6 +538,27 @@ def _parse_headers_clang(header_files: list[Path], ci: Any) -> dict[str, Any]:
                         "depends_on_init": False,
                         "init_function": "",
                         "modifies_global": False,
+                        "notes": "",
+                    },
+                    "implementation_analysis": {
+                        "source_file": "TODO: 实现此函数的 .c 文件路径（来自 c-project-analysis.md 第6节）",
+                        "internal_callees": [
+                            {
+                                "name": "TODO: 被调用的内部函数名",
+                                "source_file": "TODO: 所在 .c 文件",
+                                "purpose": "TODO: 作用说明",
+                            }
+                        ],
+                        "global_state_deps": [
+                            {
+                                "name": "TODO: 全局变量名",
+                                "c_type": "TODO: C 类型",
+                                "access": "read",
+                                "thread_safety_notes": "TODO: 确认实际访问方式（read/write/read_write）及线程安全影响",
+                            }
+                        ],
+                        "logic_summary": ["TODO: 实现逻辑步骤 1", "TODO: 步骤 2"],
+                        "conditional_compilation": [],
                         "notes": "",
                     },
                     "risk_signals": risks,
