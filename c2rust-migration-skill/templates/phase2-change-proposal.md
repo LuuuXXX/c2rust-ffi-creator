@@ -20,6 +20,117 @@
 
 ---
 
+## 接口重设计工作坊（⚠ 必须先于所有 CHG-xxx 提案完成）
+
+> **目的**：Phase 2 的接口优化不能按接口逐个击破（否则会出现底层类型改了但顶层形状没变、
+> 或顶层改了但底层结构不支持的内聚性问题）。本节要求从底层到顶层整体审视现有设计，
+> 找出系统性重设计机会，再由此派生出具体的 CHG-xxx 提案。
+>
+> **阻断门**：本节所有三层分析均须完成并签字，方可开始填写 CHG-xxx 提案。
+
+### 层 1：数据类型层重审
+
+> 逐一审查所有跨 FFI 边界传递的数据类型，评估其在 Rust 中的最佳表达方式。
+> 来源：`spec-v1.yml` 的 `types` 节 + `c-project-analysis.md` 第 6.3 节。
+
+| 原始 C 类型 | 当前 Rust FFI 类型（Phase 1） | 推荐 Rust 惯用类型（Phase 2） | 改动理由 | 对接口的影响 | 纳入 CHG |
+|---|---|---|---|---|---|
+| TODO（如 `int` 错误码） | TODO（如 `i32`） | TODO（如 `Result<T, FooError>`） | TODO | TODO（Breaking / 无影响） | TODO（如 CHG-001 / 暂缓）|
+| TODO（如 `void*` 句柄） | TODO（如 `*mut c_void`） | TODO（如 `struct FooCtx(NonNull<Inner>)`） | TODO | TODO | TODO |
+| TODO（如 C 字符串 `char*`）| TODO（如 `*const c_char`） | TODO（如 `&str` / `String` / `CStr`） | TODO | TODO | TODO |
+
+**数据类型层重审结论**：
+> TODO：描述类型层面的整体设计方向（3-5 句话），例如：统一错误类型、引入 RAII 句柄等。
+
+- [ ] 所有跨 FFI 数据类型已逐行审查
+- [ ] 每行均有明确结论（纳入 CHG 或暂缓，不允许留空）
+
+---
+
+### 层 2：实现依赖层重审
+
+> 逐一审查每个北向函数的内部实现依赖，评估哪些 C 特有的隐含依赖在 Rust 侧可以更自然地表达。
+> 来源：`spec-v1.yml` 的 `implementation_analysis` 节 + `c-project-analysis.md` 第 6 节。
+
+| 北向函数 | C 特有隐含依赖 | Rust 惯用替代方案 | 是否影响公开接口 | 纳入 CHG |
+|---|---|---|---|---|
+| TODO（如 `foo_init`） | TODO（如：全局 `g_ctx` 单例、调用方须手动 `foo_deinit`） | TODO（如：`Foo::new()` 返回 RAII 对象，`Drop` 自动释放） | TODO（是 / 否） | TODO |
+| TODO（如 `foo_query`） | TODO（如：依赖 `errno` 传递错误、需外部加锁） | TODO（如：返回 `Result<T, FooError>`、内部 `Mutex`） | TODO | TODO |
+
+**全局状态与初始化策略**：
+
+| 全局变量 / 初始化函数 | Phase 1 处理方式 | Phase 2 推荐处理方式 | 纳入 CHG |
+|---|---|---|---|
+| TODO | TODO（透传 / 封装 / 保留） | TODO（`std::sync::OnceLock` / 移入实例状态 / 删除） | TODO |
+
+**实现依赖层重审结论**：
+> TODO：描述依赖层面的整体设计方向（3-5 句话），例如：消除全局状态、改用 RAII 管理生命周期等。
+
+- [ ] 所有北向函数的实现依赖已逐行审查
+- [ ] 全局状态处理策略已确认
+- [ ] 每行均有明确结论（纳入 CHG 或暂缓）
+
+---
+
+### 层 3：顶层接口架构重审
+
+> 基于前两层的结论，整体评估模块边界、API 粒度、trait 设计和命名空间划分。
+> 目标：产出一张 Phase 2 公开接口蓝图，作为派生 CHG-xxx 提案的依据。
+
+**模块/命名空间规划**：
+
+| Phase 1 接口组 | Phase 2 建议模块 / crate | 变化说明 |
+|---|---|---|
+| TODO | TODO | TODO（拆分 / 合并 / 重命名 / 不变） |
+
+**Trait 接口设计**（若适用）：
+
+| 功能语义 | Phase 1 表达方式（C 风格函数） | Phase 2 建议 Trait / 类型 | 纳入 CHG |
+|---|---|---|---|
+| TODO（如：事件通知回调） | TODO（如：`fn_ptr` 参数） | TODO（如：`trait EventHandler`） | TODO |
+
+**API 粒度与正交性检查**：
+
+- [ ] 是否存在职责重叠的函数对（应合并）？TODO
+- [ ] 是否存在可组合但被强制绑定的函数（应拆分）？TODO
+- [ ] 新接口是否遵循「最小惊讶原则」？TODO
+- [ ] 版本兼容策略已选定（见下方「兼容期策略」节）
+
+**Phase 2 公开接口蓝图**（来自本节三层分析的汇总，派生 CHG-xxx 的依据）：
+
+```
+TODO: 用文字或伪代码描述 Phase 2 的目标公开接口形态，例如：
+  - pub struct Foo(NonNull<Inner>);
+  - impl Foo { pub fn new(cfg: &FooConfig) -> Result<Self, FooError> {...} }
+  - pub trait EventHandler { fn on_event(&mut self, ev: Event); }
+  - ...（列出所有新增 / 变更的公开项）
+```
+
+**顶层接口层重审结论**：
+> TODO：描述接口层面的整体设计方向（3-5 句话）。
+
+- [ ] 模块/命名空间规划已确认
+- [ ] Trait 接口设计已确认（或明确标注"不适用"）
+- [ ] API 粒度与正交性检查已完成
+- [ ] Phase 2 公开接口蓝图已填写
+
+---
+
+### 工作坊签字（⚠ 阻断门：签字前不得开始填写 CHG-xxx 提案）
+
+| 字段 | 值 |
+|---|---|
+| 主导设计人 | TODO |
+| 审查人 | TODO |
+| 签字日期 | TODO（YYYY-MM-DD） |
+| 遗留待议事项 | TODO（无则填"无"） |
+| 工作坊状态 | ☐ 未完成 / ☐ **已完成，允许开始填写 CHG-xxx 提案** |
+
+> **签字意味着**：三层重设计分析已整体完成，Phase 2 公开接口蓝图已确认，
+> 后续所有 CHG-xxx 提案须与本蓝图保持一致，不得引入蓝图外的接口变更。
+
+---
+
 ## 变更分类说明
 
 | 类别 | 含义 | 示例 |
