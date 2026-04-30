@@ -1,9 +1,9 @@
 ---
 name: c2rust-migration-skill
 description: >
-  使用此技能指导 C→Rust 两阶段迁移：
-  第一阶段实现位级兼容的 Rust 替代（通过薄 FFI 层复用现有 C 测试）；
-  第二阶段在完全替代后进行可控优化（明确用户确认机制）。
+  使用此技能指导 C→Rust 两阶段迁移。
+  使用 "c2rust-migration-skill translate" 触发第一阶段（位级兼容 Rust 替代：扫描头文件、生成 Spec v1 与迁移分析报告、识别风险信号、指导 ABI 冻结与 FFI 实现）；
+  使用 "c2rust-migration-skill refactor" 触发第二阶段（可控优化：生成 Phase 2 变更提案模板、指导逐项变更审查与冻结、完成 Rust 惯用化重构）。
 ---
 
 # c2rust-migration-skill
@@ -12,13 +12,32 @@ description: >
 
 本技能定义了一条以"规格驱动、测试保障、用户确认"为核心的两阶段 C→Rust 迁移路径：
 
-- **第一阶段（Phase 1）**：产出与原 C 实现位级兼容的 Rust 替代。C 侧测试全程保留并用于验证。
-- **第二阶段（Phase 2）**：在 Phase 1 完全通过后，有序引入接口优化或破坏性变更（每项变更须经用户确认）。
+- **第一阶段（Phase 1）** — `translate`：产出与原 C 实现位级兼容的 Rust 替代。C 侧测试全程保留并用于验证。
+- **第二阶段（Phase 2）** — `refactor`：在 Phase 1 完全通过后，有序引入接口优化或破坏性变更（每项变更须经用户确认）。
+
+## 触发命令
+
+安装后（将本目录整体复制到 Agent 配置的 `skills/` 目录下），支持以下两个命令触发对应阶段：
+
+| 命令 | 阶段 | 说明 |
+|---|---|---|
+| `c2rust-migration-skill translate` | Phase 1 | 扫描 C 头文件、生成 Spec v1 与迁移分析报告，指导位级兼容 Rust 替代 |
+| `c2rust-migration-skill refactor` | Phase 2 | 生成 Phase 2 变更提案模板，指导可控优化与 Rust 惯用化重构 |
+
+> 两个命令属于同一技能包，手动安装时只需复制一次目录即可获得两个触发。
+
+## 安装
+
+将 `c2rust-migration-skill/` 整个目录复制到 Agent 配置的 `skills/` 目录下：
+
+```bash
+cp -r c2rust-migration-skill /path/to/agent/config/skills/
+```
 
 ## 目录结构
 
 ```
-skills/c2rust-migration-skill/
+c2rust-migration-skill/
 ├── README.md                        ← 本文件（入口与工作流说明）
 ├── templates/
 │   ├── spec-v1-extraction.yml       ← Spec v1（as-is）提取模板
@@ -27,6 +46,8 @@ skills/c2rust-migration-skill/
 │   ├── phase1-acceptance-criteria.md    ← Phase 1 验收标准
 │   └── phase2-change-proposal.md       ← Phase 2 变更提案 & 确认清单
 ├── scripts/
+│   ├── translate.sh                 ← Phase 1 入口脚本（扫描 + 报告生成）
+│   ├── refactor.sh                  ← Phase 2 入口脚本（变更提案准备）
 │   ├── scan_headers.py              ← C 头文件扫描器（libclang / 正则回退）
 │   ├── generate_report.py           ← 报告生成器（含差分测试分级建议）
 │   └── smoke_test.sh                ← 脚本冒烟测试
@@ -43,22 +64,38 @@ skills/c2rust-migration-skill/
 - （可选）`libclang` Python 绑定：`pip install libclang`，可获得更精准的解析
 - 现有 C 项目（含头文件 `.h`）
 
-### 运行报告生成器
+### `translate` — Phase 1：扫描与报告
 
 ```bash
-# 方式一：直接使用 Python
-python scripts/scan_headers.py /path/to/c/headers --output examples/my-spec-v1.yml
-python scripts/generate_report.py examples/my-spec-v1.yml --output examples/my-report.md
+# 方式一：直接运行 Phase 1 脚本
+bash scripts/translate.sh HEADERS=/path/to/c/headers
 
-# 方式二：使用 Makefile（推荐）
-make report HEADERS=/path/to/c/headers
+# 方式二：使用 Makefile
+make translate HEADERS=/path/to/c/headers
+
+# 方式三：分步手动运行
+python scripts/scan_headers.py /path/to/c/headers --output spec-v1.yml
+python scripts/generate_report.py spec-v1.yml --output report.md
 ```
 
-生成的 `examples/my-report.md` 包含：
-- 北向接口清单（函数 / 结构体 / 类型定义）
-- 风险信号清单（回调、out buffer、全局初始化等）
-- 差分测试分级建议（Tier 0 / 1 / 2）
-- 需人工确认的 TODO 列表
+`translate` 完成后生成：
+- `spec-v1.yml`：北向接口提取结果（函数 / 结构体 / 类型定义）
+- `report.md`：迁移分析报告（风险信号 + 差分测试分级建议 + 优先级排序）
+
+### `refactor` — Phase 2：变更提案与可控优化
+
+> 前提：Phase 1 所有验收标准（`templates/phase1-acceptance-criteria.md`）已全部通过。
+
+```bash
+# 方式一：直接运行 Phase 2 脚本
+bash scripts/refactor.sh
+
+# 方式二：使用 Makefile
+make refactor
+```
+
+`refactor` 完成后生成：
+- `phase2-change-proposal.md`：Phase 2 变更提案模板（请按 CHG-xxx 逐项填写）
 
 ---
 
