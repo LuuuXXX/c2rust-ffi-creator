@@ -98,6 +98,28 @@ functions:
       init_function: ""
       modifies_global: false
       notes: ""
+    # ── 实现分析（来自 c-project-analysis.md Step 0 的分析结果）────────
+    implementation_analysis:
+      source_file: "TODO: 实现此函数的 .c 文件路径"
+      # 直接调用的内部函数（调用链，须参考完整实现，不得仅凭头文件推断）
+      internal_callees:
+        - name: "TODO: 被调用的内部函数名"
+          source_file: "TODO: 所在 .c 文件"
+          purpose: "TODO: 作用说明"
+      # 依赖的全局/静态变量
+      global_state_deps:
+        - name: "TODO: 变量名"
+          c_type: "TODO: C 类型"
+          access: "read | write | read_write"
+          thread_safety_notes: "TODO"
+      # 实现逻辑摘要（3-8 个关键步骤）
+      logic_summary:
+        - "TODO: 步骤 1"
+        - "TODO: 步骤 2"
+      # 条件编译分支（影响实现行为的 #ifdef 等）
+      conditional_compilation: []
+      # 格式: [{macro: "FEATURE_X", behavior_when_defined: "...", behavior_when_not: "..."}]
+      notes: ""
     # ── 风险信号（由 scan_headers.py 自动填充，人工确认）─────────────
     risk_signals: []
     # 格式: [{type: "CALLBACK", detail: "...", confirmed: false, decision: ""}]
