@@ -52,8 +52,15 @@ if [ -z "${HEADERS:-}" ]; then
     exit 1
 fi
 
+if [ "$SKIP_STEP0" != "1" ] && [ -z "${PROJECT:-}" ]; then
+    echo "错误：Step 0 分析需要 C 项目根目录（PROJECT=...）" >&2
+    echo "用法：bash translate.sh PROJECT=/path/to/project HEADERS=/path/to/include" >&2
+    echo "提示：若已完成 Step 0，可加 SKIP_STEP0=1 跳过此校验" >&2
+    exit 1
+fi
+
 echo "=== c2rust-migration-skill translate (Phase 1) ==="
-echo "C 项目根目录：${PROJECT:-（未指定，Step 0 将使用 HEADERS 目录）}"
+echo "C 项目根目录：${PROJECT:-（未指定，仅在 SKIP_STEP0=1 时有效）}"
 echo "头文件路径：$HEADERS"
 echo "Step 0 分析报告：$ANALYSIS_OUT"
 echo "Spec v1 输出：$SPEC_OUT"
@@ -70,7 +77,7 @@ if [ "$SKIP_STEP0" = "1" ]; then
     echo ""
 else
     echo "--- Step 0：C 项目完整分析 ---"
-    STEP0_ARGS="${PROJECT:-$HEADERS}"
+    STEP0_ARGS="$PROJECT"
     if [ -n "${BINARY:-}" ]; then
         "$PYTHON" "$SCRIPT_DIR/analyze_c_project.py" \
             "$STEP0_ARGS" \

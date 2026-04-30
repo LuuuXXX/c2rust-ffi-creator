@@ -244,10 +244,9 @@ def analyze_source_file(src: Path) -> dict[str, Any]:
     return result
 
 
-def build_callee_map(src: Path,
-                     exported_functions: list[str]) -> dict[str, list[str]]:
+def build_callee_map(src: Path) -> dict[str, list[str]]:
     """
-    For each exported function, find which other functions it directly calls.
+    For each function defined in src, find which other functions it directly calls.
     This is a best-effort text analysis; it does not parse macro expansions.
     """
     try:
@@ -609,7 +608,7 @@ def generate_report(
             func_to_file[fn] = str(sf.relative_to(root))
         all_global_vars.extend(info["global_vars"])
         all_includes.extend(extract_include_deps(sf))
-        callee_map = build_callee_map(sf, declared_fns)
+        callee_map = build_callee_map(sf)
         for fn, callees in callee_map.items():
             if fn not in all_callee_maps:
                 all_callee_maps[fn] = []
@@ -788,11 +787,21 @@ def main() -> None:
     if not root.exists():
         print(f"错误：项目根目录不存在：{root}", file=sys.stderr)
         sys.exit(1)
-
-    header_dir = Path(args.headers).resolve() if args.headers else None
-    if header_dir and not header_dir.exists():
-        print(f"错误：头文件目录不存在：{header_dir}", file=sys.stderr)
+    if not root.is_dir():
+        print(f"错误：project_root 必须是目录，而不是文件：{root}", file=sys.stderr)
         sys.exit(1)
+
+    header_dir: Path | None = None
+    if args.headers:
+        hp = Path(args.headers).resolve()
+        if not hp.exists():
+            print(f"错误：头文件路径不存在：{hp}", file=sys.stderr)
+            sys.exit(1)
+        if hp.is_file():
+            # Single header file — use its parent directory but scan only that file
+            header_dir = hp.parent
+        else:
+            header_dir = hp
 
     binary = Path(args.binary).resolve() if args.binary else None
     output = Path(args.output)

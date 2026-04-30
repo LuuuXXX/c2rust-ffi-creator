@@ -176,7 +176,8 @@ make refactor
    ```bash
    python scripts/analyze_c_project.py /path/to/c/project \
        --headers /path/to/include \
-       --binary /path/to/libfoo.so \   # 若已构建
+       # 若已构建，可提供已构建产物路径
+       --binary /path/to/libfoo.so \
        --output c-project-analysis.md
    ```
 2. 打开生成的 `c-project-analysis.md`，逐节补全所有 `TODO` 项：

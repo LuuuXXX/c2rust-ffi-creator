@@ -61,11 +61,14 @@ help:
 	@echo "  make refactor"
 
 analyze:
+ifndef PROJECT
+	$(error 请指定 C 项目根目录：make analyze PROJECT=<根目录> HEADERS=/path/to/include)
+endif
 ifndef HEADERS
 	$(error 请指定头文件目录：make analyze PROJECT=<根目录> HEADERS=/path/to/include)
 endif
 	$(PYTHON) $(SCRIPTS)/analyze_c_project.py \
-		"$(or $(PROJECT),$(HEADERS))" \
+		"$(PROJECT)" \
 		--headers "$(HEADERS)" \
 		$(if $(BINARY),--binary "$(BINARY)",) \
 		--output "$(ANALYSIS_OUT)"
@@ -84,7 +87,7 @@ endif
 	TEST_COVERAGE="$(TEST_COVERAGE)" \
 	SKIP_STEP0="$(SKIP_STEP0)" \
 	bash $(SCRIPTS)/translate.sh \
-		PROJECT="$(or $(PROJECT),$(HEADERS))" \
+		$(if $(PROJECT),PROJECT="$(PROJECT)",) \
 		HEADERS="$(HEADERS)" \
 		$(if $(BINARY),BINARY="$(BINARY)",)
 
