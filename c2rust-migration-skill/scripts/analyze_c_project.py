@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import argparse
 import datetime
-import os
 import re
 import subprocess
 import sys
@@ -400,6 +399,7 @@ def generate_report(
     header_dir: Path | None,
     binary: Path | None,
     output: Path,
+    explicit_header_files: list[Path] | None = None,
 ) -> None:
     now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines: list[str] = []
@@ -457,7 +457,10 @@ def generate_report(
     lines.append(f"## 2. 项目文件清单")
     lines.append(f"")
     src_files = collect_files(root, [".c"])
-    header_files = collect_files(header_dir or root, [".h"])
+    if explicit_header_files is not None:
+        header_files = explicit_header_files
+    else:
+        header_files = collect_files(header_dir or root, [".h"])
     test_files = [f for f in src_files if is_test_file(f)]
     impl_files = [f for f in src_files if not is_test_file(f)]
 
@@ -792,21 +795,22 @@ def main() -> None:
         sys.exit(1)
 
     header_dir: Path | None = None
+    explicit_header_files: list[Path] | None = None
     if args.headers:
         hp = Path(args.headers).resolve()
         if not hp.exists():
             print(f"错误：头文件路径不存在：{hp}", file=sys.stderr)
             sys.exit(1)
         if hp.is_file():
-            # Single header file — use its parent directory but scan only that file
-            header_dir = hp.parent
+            # Single header file — scan only that file, not the whole parent directory
+            explicit_header_files = [hp]
         else:
             header_dir = hp
 
     binary = Path(args.binary).resolve() if args.binary else None
     output = Path(args.output)
 
-    generate_report(root, header_dir, binary, output)
+    generate_report(root, header_dir, binary, output, explicit_header_files)
 
 
 if __name__ == "__main__":

@@ -110,7 +110,7 @@ functions:
       global_state_deps:
         - name: "TODO: 变量名"
           c_type: "TODO: C 类型"
-          access: "read | write | read_write"
+          access: "read"   # 可选值: "read" | "write" | "read_write"
           thread_safety_notes: "TODO"
       # 实现逻辑摘要（3-8 个关键步骤）
       logic_summary:
